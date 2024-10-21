@@ -14,7 +14,6 @@ def test_connection():
 def main():
     state = State()
     core_engine = CoreEngine(state)
-    core_engine.test_connection()
     command_parser = CommandParser(state, core_engine)
 
     print("Welcome to PentestGPT")
