@@ -5,11 +5,6 @@ from pentestgpt.modules.core import CoreEngine
 from pentestgpt.modules.state import State
 
 
-def test_connection():
-    # test initialize the three sessions and run test connections
-    state = State()
-    core_engine = CoreEngine(state)
-
 
 def main():
     state = State()
