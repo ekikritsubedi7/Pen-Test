@@ -30,6 +30,7 @@ newspaper3k = "^0.2.8"
 google-generativeai= "^0.5.2" 
 toml = "^0.10.2"
 litellm = "^1.50.1"
+python-dotenv = "^1.0.1"
 
 [tool.poetry.scripts]
 pentestgpt="pentestgpt.main:main"
