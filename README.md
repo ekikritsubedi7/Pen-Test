@@ -45,6 +45,7 @@
 
 
 <!-- ABOUT THE PROJECT -->
+<a href="https://trendshift.io/repositories/3770" target="_blank"><img src="https://trendshift.io/api/badge/repositories/3770" alt="GreyDGL%2FPentestGPT | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 ## General Updates
 - [Update on 25/10/2024] We're completing the refactoring of PentestGPT and will release v1.0 soon!
 - [Update on 12/08/2024] The research paper on PentestGPT is published at [USENIX Security 2024](https://www.usenix.org/conference/usenixsecurity24/presentation/deng)
