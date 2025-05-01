@@ -191,7 +191,7 @@ PentestGPT is tested under `Python 3.10`. Other Python3 versions should work but
 
 ## Custom Model Endpoints and Local LLMs
 PentestGPT now support local LLMs, but the prompts are only optimized for GPT-4.
-- To use local GPT4ALL model, you may run `pentestgpt --reasoning_model=gpt4all --parsing_model=gpt4all`.
+- To use local GPT4ALL model, you may run `pentestgpt --reasoning=gpt4all --parsing=gpt4all`.
 - To select the particular model you want to use with GPT4ALL, you may update the `module_mapping` class in `pentestgpt/utils/APIs/module_import.py`.
 - You can also follow the examples of `module_import.py`, `gpt4all.py` and `chatgpt_api.py` to create API support for your own model.
 
