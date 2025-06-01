@@ -70,6 +70,7 @@ pip3 install git+https://github.com/GreyDGL/PentestGPT
 export OPENAI_API_KEY='your_key_here'         # For OpenAI models
 export GOOGLE_API_KEY='your_key_here'         # For Gemini models
 export DEEPSEEK_API_KEY='your_key_here'       # For Deepseek models
+export DEEPSEEK_BASEURL='your_custom_deepseek_base_url_here' # Optional: if you use a proxy or different DeepSeek endpoint
 
 # Test connection
 pentestgpt-connection
