@@ -1,2 +1,4 @@
-1. estimated duration maximum. check earlier.
-2. shell should run as root
+1. Get playwright to work --> async problems 
+
+Things that might cause problems (not tested):
+1. infinite password prompting loop when connecting to service and not knowing pw
