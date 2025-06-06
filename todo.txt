@@ -1,0 +1,2 @@
+1. estimated duration maximum. check earlier.
+2. shell should run as root
