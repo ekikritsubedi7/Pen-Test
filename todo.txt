@@ -1,4 +1,6 @@
-1. Get playwright to work --> async problems 
+Things that cause problems
+1. vim/more etc. cause dead end because no options to get out in interaction
+2. no option to interact with stuff like file uploads
 
 Things that might cause problems (not tested):
 1. infinite password prompting loop when connecting to service and not knowing pw
