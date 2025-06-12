@@ -1,4 +1,5 @@
 import json
+import os
 
 
 def load_log_file(filepath):
@@ -60,11 +61,12 @@ if __name__ == "__main__":
     input_path = input(
         "Enter the path to the log file (e.g., example_log.json): "
     ).strip()
+    filename_without_ext = os.path.splitext(os.path.basename(input_path))[0]
     output_path = input(
-        "Enter the desired output file name [default: formatted_output.txt]: "
+        f"Enter the desired output file name [default: {filename_without_ext}_formatted.txt]: "
     ).strip()
     if not output_path:
-        output_path = "formatted_output.txt"
+        output_path = filename_without_ext + "_formatted.txt"
 
     log_data = load_log_file(input_path)
     formatted_text = convert_log_to_formatted_text(log_data)
