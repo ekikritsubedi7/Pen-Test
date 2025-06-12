@@ -1,6 +1,10 @@
+Improvements?
+1. Maybe dont go for full pentestgpt loop after something like user input
+
 Things that cause problems
 1. vim/more etc. cause dead end because no options to get out in interaction
 2. no option to interact with stuff like file uploads / limit of browser interaction in general. Also label found etc.
+3. PTT gets smaller?
 
 Things that might cause problems (not tested):
 1. infinite password prompting loop when connecting to service and not knowing pw
