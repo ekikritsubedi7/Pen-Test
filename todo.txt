@@ -1,14 +1,12 @@
 TODO FIRST:
 Fix requirements.txt conflicts
-No option to interact with stuff like file uploads / limit of browser interaction in general. Also label found etc.
 
 Improvements?
 1. Maybe dont go for full pentestgpt loop after something like user input
 
 Things that cause problems
 1. vim/more etc. cause dead end because no options to get out in interaction
-
-3. PTT gets smaller?
+2. PTT gets smaller?
 
 Things that might cause problems (not tested):
 1. infinite password prompting loop when connecting to service and not knowing pw
