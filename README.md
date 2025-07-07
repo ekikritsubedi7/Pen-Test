@@ -45,40 +45,23 @@
 <a href="https://trendshift.io/repositories/3770" target="_blank"><img src="https://trendshift.io/api/badge/repositories/3770" alt="GreyDGL%2FPentestGPT | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 
-> [!NOTE]
-> **Cybersecurity AI ([`CAI`](https://github.com/aliasrobotics/CAI))**
-> 
-> The original authors of PentestGPT have launched a new project: **Cybersecurity AI (`CAI`)**! `CAI` represents the next evolution in AI-powered cybersecurity tools, building upon the foundations established by PentestGPT.
-> 
-> - <ins>Repository</ins>: https://github.com/aliasrobotics/CAI
-> - <ins>Technical Report</ins>: https://arxiv.org/pdf/2504.06017
-
 > [!WARNING]
-> **PentestGPT is NOT a product - Research prototype only**
+> **PentestGPT is a research prototype only**
 > 
-> PentestGPT is <ins>NOT a product or service</ins>, it is solely a research prototype that pioneered the use of GenAI in cybersecurity. We built it back in 2022/2023 and published it a year afterwards.
-> 
-> **⚠️ Scams all over the place**: We keep seeing copycats (e.g. [this one](https://github.com/hackerai-tech/PentestGPT) which misrepresents us) trying to offer paid services based on PentestGPT. <ins>There's no need to pay for it</ins> and you should not unless you want to be scammed with a simple front-end.
-> 
-> For more details, see: https://www.reddit.com/r/cybersecurity/comments/1l9m2f1/pentestgpt_is_not_a_product_solely_a_research/. If you're looking for a more contemporary version, check [**Cybersecurity AI (CAI)**](https://github.com/aliasrobotics/CAI) above, which is the evolution of PentestGPT by the majority of the original leading authors.
+> PentestGPT is a research prototype that pioneered the use of GenAI in cybersecurity. Please be aware of third-party services claiming to offer paid PentestGPT products - the original project is free and open-source.
 
 
 
 ## General Updates
-- [Update on 14/06/2025] We added a note concerning scams and copycats related to PentestGPT, as well as a pointer to our new project [`CAI`](https://github.com/aliasrobotics/CAI) ([tech report](https://arxiv.org/pdf/2504.06017)). Please be careful with the misleading marketing efforts from third parties!
+- [Update on 07/07/2025] We introduce a new benchmarking system into PentestGPT [pipeline](benchmark/README.md). The PentestGPT v2.0 agentic upgrade will be ready soon.
+- [Update on 14/06/2025] Introducing **Cybersecurity AI ([`CAI`](https://github.com/aliasrobotics/CAI))**: The authors of PentestGPT have launched a new project that represents the next evolution in AI-powered cybersecurity tools, building upon the foundations established by PentestGPT.
+  - <ins>Repository</ins>: https://github.com/aliasrobotics/CAI
+  - <ins>Technical Report</ins>: https://arxiv.org/pdf/2504.06017
+- [Update on 14/06/2025] We added warnings about scams and copycats misrepresenting PentestGPT as paid services. For more details, see: https://www.reddit.com/r/cybersecurity/comments/1l9m2f1/pentestgpt_is_not_a_product_solely_a_research/
 - [Update on 25/10/2024] We're completing the refactoring of PentestGPT and will release v1.0 soon!
+- 
 - [Update on 12/08/2024] The research paper on PentestGPT is published at [USENIX Security 2024](https://www.usenix.org/conference/usenixsecurity24/presentation/deng)
 - [Update on 25/03/2024] We're working on the next version of PentestGPT, with online searching, RAGs and more powerful prompting. Stay tuned!
-- [Update on 17/11/2023] GPTs for PentestGPT is out! Check this: https://chat.openai.com/g/g-4MHbTepWO-pentestgpt
-- [Update on 07/11/2023] GPT-4-turbo is out! Update the default API usage to GPT-4-turbo. 
-- Available videos:
-  - The latest installation video is [here](https://youtu.be/tGC5z14dE24).
-  - **PentestGPT for OSCP-like machine: [HTB-Jarvis](https://youtu.be/lAjLIj1JT3c)**. This is the first part only, and I'll complete the rest when I have time.
-  - **PentestGPT on [HTB-Lame](https://youtu.be/Vs9DFtAkODM)**. This is an easy machine, but it shows you how PentestGPT skipped the rabbit hole and worked on other potential vulnerabilities.
-- **We're testing PentestGPT on HackTheBox**. You may follow [this link](https://www.hackthebox.com/home/users/profile/1489431). More details will be released soon.
-- Feel free to join the [Discord Channel](https://discord.gg/eC34CEfEkK) for more updates and share your ideas!
-
-
 <!-- Quick Start -->
 ## Quick Install & Setup
 ```
