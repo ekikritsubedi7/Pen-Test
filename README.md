@@ -59,7 +59,6 @@
   - <ins>Technical Report</ins>: https://arxiv.org/pdf/2504.06017
 - [Update on 14/06/2025] We added warnings about scams and copycats misrepresenting PentestGPT as paid services. For more details, see: https://www.reddit.com/r/cybersecurity/comments/1l9m2f1/pentestgpt_is_not_a_product_solely_a_research/
 - [Update on 25/10/2024] We're completing the refactoring of PentestGPT and will release v1.0 soon!
-- 
 - [Update on 12/08/2024] The research paper on PentestGPT is published at [USENIX Security 2024](https://www.usenix.org/conference/usenixsecurity24/presentation/deng)
 - [Update on 25/03/2024] We're working on the next version of PentestGPT, with online searching, RAGs and more powerful prompting. Stay tuned!
 <!-- Quick Start -->
