@@ -79,6 +79,31 @@ pentestgpt-connection
 pentestgpt
 ```
 
+## Local Model Setup (Ollama)
+
+For privacy-focused or offline usage, you can use Ollama to run models locally:
+
+```bash
+# 1. Install Ollama (visit https://ollama.ai for installation instructions)
+# 2. Pull a compatible model
+ollama pull llama3.1:latest
+
+# 3. Start Ollama server (if not auto-started)
+ollama serve
+
+# 4. Use with PentestGPT
+pentestgpt --ollama llama3.1:latest
+```
+
+**Environment Variables for Ollama:**
+- `OLLAMA_BASE_URL`: Server URL (default: `http://localhost:11434`)
+- `OLLAMA_MODEL`: Default model name (default: `llama3.1:latest`)
+
+**Recommended Ollama Models for Penetration Testing:**
+- `llama3.1:latest` - General purpose, good balance of size and capability
+- `codellama:7b` - Specialized for code analysis and security tasks
+- `deepseek-coder:6.7b` - Excellent for code understanding and vulnerability analysis
+
 ## Available Models
 
 View available models:
@@ -89,6 +114,7 @@ Current models include
 - OpenAI: gpt-4o (default), o3, o4-mini, gpt4all
 - Gemini: gemini-2.5-flash, gemini-2.5-pro
 - Deepseek: deepseek-r1, deepseek-v3
+- Local: gpt4all, ollama (requires local installation)
 
 
 ## Usage
@@ -96,8 +122,53 @@ Current models include
 ```
 pentestgpt [-h] [--logDir LOGDIR] [--baseUrl BASEURL] [--models] 
            [--reasoning MODEL_NAME] [--parsing MODEL_NAME] 
-           [--logging] [--useAPI]
+           [--logging] [--useAPI] [--ollama MODEL_NAME]
 ```
+
+### Model Selection Examples
+
+```bash
+# Use default model (GPT-4o)
+pentestgpt
+
+# Use specific models for reasoning and parsing
+pentestgpt --reasoning o3 --parsing gpt-4o
+
+# Use Ollama with a local model
+pentestgpt --ollama llama3.1:latest
+
+# Use Ollama with CodeLlama for code analysis
+pentestgpt --ollama codellama:7b
+```
+
+### Ollama Troubleshooting
+
+**Common Issues:**
+
+1. **"Cannot connect to Ollama server"**
+   ```bash
+   # Check if Ollama is running
+   curl http://localhost:11434/api/tags
+   
+   # Start Ollama if not running
+   ollama serve
+   ```
+
+2. **"Model not found" warning**
+   ```bash
+   # Pull the specific model you want to use
+   ollama pull llama3.1:latest
+   
+   # List available models
+   ollama list
+   ```
+
+3. **Custom Ollama server URL**
+   ```bash
+   # Use Ollama running on different host/port
+   export OLLAMA_BASE_URL="http://your-server:11434"
+   pentestgpt --ollama llama3.1:latest
+   ```
 
 ### Basic Tool Commands
 
