@@ -1,41 +1,38 @@
 import os
-from datetime import datetime
+import unittest
+from unittest.mock import MagicMock, patch
 
-# get keys for your project
-os.environ[
-    "LANGFUSE_PUBLIC_KEY"
-] = "pk-lf-5655b061-3724-43ee-87bb-28fab0b5f676"  # do not modify
-os.environ[
-    "LANGFUSE_SECRET_KEY"
-] = "sk-lf-c24b40ef-8157-44af-a840-6bae2c9358b0"  # do not modify
-from langfuse import Langfuse
+from pentestgpt.config.chat_config import ChatGPTConfig
+from pentestgpt.utils.APIs.chatgpt_api import ChatGPTAPI
 
-langfuse = Langfuse()
 
-from langfuse.model import CreateTrace, CreateSpan, CreateGeneration, CreateEvent
+class TestLangfuseIntegration(unittest.TestCase):
+    @patch("pentestgpt.utils.APIs.chatgpt_api.OpenAI")
+    def test_langfuse_logging_sets_environment_and_client(self, mock_openai):
+        config = ChatGPTConfig()
+        config.model = "gpt-4o"
+        config.log_dir = "logs"
 
-trace = langfuse.trace(CreateTrace(name="llm-feature"))
-retrieval = trace.span(CreateSpan(name="retrieval"))
-retrieval.generation(CreateGeneration(name="query-creation"))
-retrieval.span(CreateSpan(name="vector-db-search"))
-retrieval.event(CreateEvent(name="db-summary"))
-trace.generation(CreateGeneration(name="user-output"))
-generationStartTime = datetime.now()
+        with patch("pentestgpt.utils.APIs.chatgpt_api.Langfuse") as mock_langfuse:
+            mock_instance = MagicMock()
+            mock_langfuse.return_value = mock_instance
 
-generation = trace.generation(
-    CreateGeneration(
-        name="summary-generation",
-        startTime=generationStartTime,
-        endTime=datetime.now(),
-        model="gpt-3.5-turbo",
-        modelParameters={"maxTokens": "1000", "temperature": "0.9"},
-        prompt=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {
-                "role": "user",
-                "content": "Please generate a summary of the following documents \nThe engineering department defined the following OKR goals...\nThe marketing department defined the following OKR goals...",
-            },
-        ],
-        metadata={"interface": "whatsapp"},
-    )
-)
+            api = ChatGPTAPI(config, use_langfuse_logging=True)
+
+        self.assertTrue(hasattr(api, "langfuse"))
+        self.assertEqual(api.langfuse, mock_instance)
+        self.assertEqual(
+            os.environ.get("LANGFUSE_PUBLIC_KEY"),
+            "pk-lf-5655b061-3724-43ee-87bb-28fab0b5f676",
+        )
+        self.assertEqual(
+            os.environ.get("LANGFUSE_SECRET_KEY"),
+            "sk-lf-c24b40ef-8157-44af-a840-6bae2c9358b0",
+        )
+        mock_openai.assert_called_once_with(
+            api_key=config.openai_key, base_url=config.api_base
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
