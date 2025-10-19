@@ -79,6 +79,8 @@ pentestgpt-connection
 pentestgpt
 ```
 
+> For a step-by-step environment setup (virtual environments, testing, and troubleshooting), see the [Quick Start Guide](docs/QUICK_START.md).
+
 ## Local Model Setup (Ollama)
 
 For privacy-focused or offline usage, you can use Ollama to run models locally:

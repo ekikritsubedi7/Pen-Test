@@ -37,6 +37,11 @@ pentestgpt-connection="pentestgpt.test_connection:test_connection"
 pentestgpt-cookie="pentestgpt.extract_cookie:main"
 
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test*.py"]
+
+
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
