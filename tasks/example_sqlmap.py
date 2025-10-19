@@ -1,5 +1,4 @@
 from chatgpt_wrapper import ChatGPT
-import os
 from task_handle.template import chatGPTTemplate
 from task_handle.custom_exceptions import NoCodeFromResponseException
 

@@ -4,9 +4,8 @@ Evaluates pentest logs against target definitions using LLM and rule-based metho
 """
 
 import re
-import json
 from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
 # Import target definitions from the encoder module
