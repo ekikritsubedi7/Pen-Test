@@ -46,18 +46,14 @@ class TestAgentController:
         assert controller.state == AgentState.IDLE
 
     @pytest.mark.asyncio
-    async def test_run_success(
-        self, controller: AgentController, mock_backend: MockBackend
-    ):
+    async def test_run_success(self, controller: AgentController, mock_backend: MockBackend):
         """Test successful run."""
         # Set up messages
         mock_backend.set_messages(
             [
                 AgentMessage(type=MessageType.TEXT, content="Starting task..."),
                 AgentMessage(type=MessageType.TEXT, content="Found flag{test123}!"),
-                AgentMessage(
-                    type=MessageType.RESULT, content=None, metadata={"cost_usd": 0.5}
-                ),
+                AgentMessage(type=MessageType.RESULT, content=None, metadata={"cost_usd": 0.5}),
             ]
         )
 
@@ -94,12 +90,8 @@ class TestAgentController:
 
     @pytest.mark.asyncio
     @pytest.mark.slow
-    @pytest.mark.skip(
-        reason="Async pause/resume test requires concurrent task management"
-    )
-    async def test_pause_and_resume(
-        self, controller: AgentController, mock_backend: MockBackend
-    ):
+    @pytest.mark.skip(reason="Async pause/resume test requires concurrent task management")
+    async def test_pause_and_resume(self, controller: AgentController, mock_backend: MockBackend):
         """Test pause and resume functionality.
 
         Note: This test is skipped because properly testing async pause/resume
@@ -125,9 +117,7 @@ class TestAgentController:
     @pytest.mark.asyncio
     @pytest.mark.slow
     @pytest.mark.skip(reason="Async stop test requires concurrent task management")
-    async def test_stop_during_run(
-        self, controller: AgentController, mock_backend: MockBackend
-    ):
+    async def test_stop_during_run(self, controller: AgentController, mock_backend: MockBackend):
         """Test stopping during run.
 
         Note: This test is skipped because properly testing async stop
@@ -142,9 +132,7 @@ class TestAgentController:
         assert controller.inject("New instruction") is False
 
     @pytest.mark.asyncio
-    async def test_flag_detection(
-        self, controller: AgentController, mock_backend: MockBackend
-    ):
+    async def test_flag_detection(self, controller: AgentController, mock_backend: MockBackend):
         """Test flag detection patterns."""
         mock_backend.set_messages(
             [
@@ -172,9 +160,7 @@ class TestAgentController:
         assert "not found" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_backend_error(
-        self, controller: AgentController, mock_backend: MockBackend
-    ):
+    async def test_backend_error(self, controller: AgentController, mock_backend: MockBackend):
         """Test handling backend errors."""
 
         async def error_messages():

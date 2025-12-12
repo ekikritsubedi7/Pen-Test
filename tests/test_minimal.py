@@ -76,6 +76,7 @@ async def test_tui_creation():
     except Exception as e:
         print(f"  ✗ TUI creation failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -102,6 +103,7 @@ async def test_session_store():
     except Exception as e:
         print(f"  ✗ SessionStore test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -145,6 +147,7 @@ async def test_run_tui_mode():
     except Exception as e:
         print(f"  ✗ run_tui_mode test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

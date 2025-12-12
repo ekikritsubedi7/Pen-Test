@@ -75,12 +75,8 @@ async def test_backend_creation():
         print(f"  ✓ Backend created: {backend}")
 
         # Check if methods are coroutine functions
-        print(
-            f"  ✓ connect is coroutine function: {asyncio.iscoroutinefunction(backend.connect)}"
-        )
-        print(
-            f"  ✓ query is coroutine function: {asyncio.iscoroutinefunction(backend.query)}"
-        )
+        print(f"  ✓ connect is coroutine function: {asyncio.iscoroutinefunction(backend.connect)}")
+        print(f"  ✓ query is coroutine function: {asyncio.iscoroutinefunction(backend.query)}")
         print(
             f"  ✓ disconnect is coroutine function: {asyncio.iscoroutinefunction(backend.disconnect)}"
         )

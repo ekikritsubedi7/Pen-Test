@@ -101,9 +101,7 @@ class TestAgentController:
             [
                 AgentMessage(type=MessageType.TEXT, content="Starting task..."),
                 AgentMessage(type=MessageType.TEXT, content="Found flag{test123}!"),
-                AgentMessage(
-                    type=MessageType.RESULT, content=None, metadata={"cost_usd": 0.5}
-                ),
+                AgentMessage(type=MessageType.RESULT, content=None, metadata={"cost_usd": 0.5}),
             ]
         )
 

@@ -148,13 +148,9 @@ class TestLangfuseIntegration:
         langfuse_module._current_span = None
 
         # These should not raise exceptions
-        langfuse_module._handle_state(
-            Event(EventType.STATE_CHANGED, {"state": "running"})
-        )
+        langfuse_module._handle_state(Event(EventType.STATE_CHANGED, {"state": "running"}))
         langfuse_module._handle_message(Event(EventType.MESSAGE, {"text": "test"}))
-        langfuse_module._handle_tool(
-            Event(EventType.TOOL, {"status": "start", "name": "bash"})
-        )
+        langfuse_module._handle_tool(Event(EventType.TOOL, {"status": "start", "name": "bash"}))
         langfuse_module._handle_flag(Event(EventType.FLAG_FOUND, {"flag": "test"}))
 
     def test_state_handler_creates_span_on_running(self):
@@ -174,9 +170,7 @@ class TestLangfuseIntegration:
         langfuse_module._user_id = "test-user-id-1234"
 
         langfuse_module._handle_state(
-            Event(
-                EventType.STATE_CHANGED, {"state": "running", "details": "10.10.11.234"}
-            )
+            Event(EventType.STATE_CHANGED, {"state": "running", "details": "10.10.11.234"})
         )
 
         # Verify start_span was called with correct parameters
@@ -211,9 +205,7 @@ class TestLangfuseIntegration:
         langfuse_module._current_span = mock_span
         langfuse_module._session_target = "10.10.11.234"
 
-        langfuse_module._handle_state(
-            Event(EventType.STATE_CHANGED, {"state": "completed"})
-        )
+        langfuse_module._handle_state(Event(EventType.STATE_CHANGED, {"state": "completed"}))
 
         mock_span.update.assert_called_once_with(
             output={"final_state": "completed", "target": "10.10.11.234"}
