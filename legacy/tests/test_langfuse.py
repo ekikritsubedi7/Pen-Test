@@ -2,12 +2,12 @@ import os
 from datetime import datetime
 
 # get keys for your project
-os.environ["LANGFUSE_PUBLIC_KEY"] = (
-    "pk-lf-5655b061-3724-43ee-87bb-28fab0b5f676"  # do not modify
-)
-os.environ["LANGFUSE_SECRET_KEY"] = (
-    "sk-lf-c24b40ef-8157-44af-a840-6bae2c9358b0"  # do not modify
-)
+os.environ[
+    "LANGFUSE_PUBLIC_KEY"
+] = "pk-lf-5655b061-3724-43ee-87bb-28fab0b5f676"  # do not modify
+os.environ[
+    "LANGFUSE_SECRET_KEY"
+] = "sk-lf-c24b40ef-8157-44af-a840-6bae2c9358b0"  # do not modify
 from langfuse import Langfuse
 
 langfuse = Langfuse()

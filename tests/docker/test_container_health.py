@@ -76,14 +76,7 @@ class TestContainerHealth:
     def test_container_starts(self, running_container: str):
         """Test that the container starts successfully."""
         result = subprocess.run(
-            [
-                "docker",
-                "ps",
-                "-f",
-                f"name={running_container}",
-                "--format",
-                "{{.Status}}",
-            ],
+            ["docker", "ps", "-f", f"name={running_container}", "--format", "{{.Status}}"],
             capture_output=True,
             text=True,
             timeout=10,

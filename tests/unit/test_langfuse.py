@@ -259,10 +259,7 @@ class TestLangfuseIntegration:
         langfuse_module._current_span = mock_span
 
         langfuse_module._handle_tool(
-            Event(
-                EventType.TOOL,
-                {"status": "start", "name": "bash", "args": {"cmd": "ls"}},
-            )
+            Event(EventType.TOOL, {"status": "start", "name": "bash", "args": {"cmd": "ls"}})
         )
 
         mock_span.start_span.assert_called_once_with(
@@ -289,10 +286,7 @@ class TestLangfuseIntegration:
         langfuse_module._current_span = mock_span
 
         langfuse_module._handle_flag(
-            Event(
-                EventType.FLAG_FOUND,
-                {"flag": "flag{test}", "context": "Found in output"},
-            )
+            Event(EventType.FLAG_FOUND, {"flag": "flag{test}", "context": "Found in output"})
         )
 
         mock_span.start_span.assert_called_once_with(
