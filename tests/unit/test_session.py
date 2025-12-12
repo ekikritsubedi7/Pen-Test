@@ -88,7 +88,9 @@ class TestSessionStore:
         assert session.task == "Solve CTF"
         assert session_store.current == session
 
-    def test_save_and_load_session(self, session_store: SessionStore, temp_sessions_dir: Path):
+    def test_save_and_load_session(
+        self, session_store: SessionStore, temp_sessions_dir: Path
+    ):
         """Test saving and loading a session."""
         session = session_store.create(
             target="example.com",

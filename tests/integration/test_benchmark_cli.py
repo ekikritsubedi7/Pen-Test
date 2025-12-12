@@ -150,7 +150,9 @@ class TestBenchmarkCLI:
         assert "Error:" in captured.out
 
     @patch("pentestgpt.benchmark.cli.start_benchmark")
-    def test_cmd_start_success(self, mock_start: MagicMock, sample_benchmark_dir: Path, capsys):
+    def test_cmd_start_success(
+        self, mock_start: MagicMock, sample_benchmark_dir: Path, capsys
+    ):
         """Test starting a benchmark successfully."""
         mock_start.return_value = {
             "success": True,
@@ -170,7 +172,9 @@ class TestBenchmarkCLI:
         assert "http://localhost:8080" in captured.out
 
     @patch("pentestgpt.benchmark.cli.start_benchmark")
-    def test_cmd_start_failure(self, mock_start: MagicMock, sample_benchmark_dir: Path, capsys):
+    def test_cmd_start_failure(
+        self, mock_start: MagicMock, sample_benchmark_dir: Path, capsys
+    ):
         """Test handling failed benchmark start."""
         mock_start.return_value = {
             "success": False,
@@ -201,7 +205,9 @@ class TestBenchmarkCLI:
         assert "not found" in captured.out
 
     @patch("pentestgpt.benchmark.cli.stop_benchmark")
-    def test_cmd_stop_success(self, mock_stop: MagicMock, sample_benchmark_dir: Path, capsys):
+    def test_cmd_stop_success(
+        self, mock_stop: MagicMock, sample_benchmark_dir: Path, capsys
+    ):
         """Test stopping a benchmark successfully."""
         mock_stop.return_value = {"success": True}
 
@@ -217,7 +223,9 @@ class TestBenchmarkCLI:
         assert "stopped successfully" in captured.out
 
     @patch("pentestgpt.benchmark.cli.stop_benchmark")
-    def test_cmd_stop_failure(self, mock_stop: MagicMock, sample_benchmark_dir: Path, capsys):
+    def test_cmd_stop_failure(
+        self, mock_stop: MagicMock, sample_benchmark_dir: Path, capsys
+    ):
         """Test handling failed benchmark stop."""
         mock_stop.return_value = {
             "success": False,

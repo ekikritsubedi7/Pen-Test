@@ -14,6 +14,7 @@ async def test_run_pentest_dry():
 
     try:
         from pentestgpt.core.agent import run_pentest
+
         print(f"  ✓ run_pentest imported: {run_pentest}")
         print(f"  ✓ Is coroutine function: {asyncio.iscoroutinefunction(run_pentest)}")
 
@@ -23,6 +24,7 @@ async def test_run_pentest_dry():
     except Exception as e:
         print(f"  ✗ Import failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -43,13 +45,16 @@ async def test_controller_creation():
         print(f"  ✓ Controller state: {controller.state}")
 
         # Check if run is a coroutine function
-        print(f"  ✓ controller.run is coroutine function: {asyncio.iscoroutinefunction(controller.run)}")
+        print(
+            f"  ✓ controller.run is coroutine function: {asyncio.iscoroutinefunction(controller.run)}"
+        )
 
         return True
 
     except Exception as e:
         print(f"  ✗ Controller creation failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -70,15 +75,22 @@ async def test_backend_creation():
         print(f"  ✓ Backend created: {backend}")
 
         # Check if methods are coroutine functions
-        print(f"  ✓ connect is coroutine function: {asyncio.iscoroutinefunction(backend.connect)}")
-        print(f"  ✓ query is coroutine function: {asyncio.iscoroutinefunction(backend.query)}")
-        print(f"  ✓ disconnect is coroutine function: {asyncio.iscoroutinefunction(backend.disconnect)}")
+        print(
+            f"  ✓ connect is coroutine function: {asyncio.iscoroutinefunction(backend.connect)}"
+        )
+        print(
+            f"  ✓ query is coroutine function: {asyncio.iscoroutinefunction(backend.query)}"
+        )
+        print(
+            f"  ✓ disconnect is coroutine function: {asyncio.iscoroutinefunction(backend.disconnect)}"
+        )
 
         return True
 
     except Exception as e:
         print(f"  ✗ Backend creation failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -114,6 +126,7 @@ async def test_event_bus():
     except Exception as e:
         print(f"  ✗ EventBus test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

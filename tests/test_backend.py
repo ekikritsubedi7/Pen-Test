@@ -71,6 +71,7 @@ async def test_controller():
     except Exception as e:
         print(f"Error: {type(e).__name__}: {e}")
         import traceback
+
         traceback.print_exc()
 
 
@@ -81,6 +82,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"SDK test failed: {type(e).__name__}: {e}")
         import traceback
+
         traceback.print_exc()
 
     print("\n" + "=" * 60 + "\n")
@@ -91,4 +93,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Controller test failed: {type(e).__name__}: {e}")
         import traceback
+
         traceback.print_exc()

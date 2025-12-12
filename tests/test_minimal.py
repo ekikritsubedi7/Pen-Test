@@ -13,6 +13,7 @@ async def test_imports():
     print("Step 1: Testing basic imports...")
     try:
         from pentestgpt.core.session import SessionStore, SessionInfo, SessionStatus
+
         print("  ✓ session module imported")
     except Exception as e:
         print(f"  ✗ session import failed: {e}")
@@ -20,13 +21,20 @@ async def test_imports():
 
     try:
         from pentestgpt.core.events import EventBus, EventType, Event
+
         print("  ✓ events module imported")
     except Exception as e:
         print(f"  ✗ events import failed: {e}")
         return False
 
     try:
-        from pentestgpt.core.backend import AgentBackend, ClaudeCodeBackend, AgentMessage, MessageType
+        from pentestgpt.core.backend import (
+            AgentBackend,
+            ClaudeCodeBackend,
+            AgentMessage,
+            MessageType,
+        )
+
         print("  ✓ backend module imported")
     except Exception as e:
         print(f"  ✗ backend import failed: {e}")
@@ -34,6 +42,7 @@ async def test_imports():
 
     try:
         from pentestgpt.core.controller import AgentController, AgentState
+
         print("  ✓ controller module imported")
     except Exception as e:
         print(f"  ✗ controller import failed: {e}")
@@ -41,6 +50,7 @@ async def test_imports():
 
     try:
         from pentestgpt.interface.tui import run_tui, PentestGPTApp
+
         print("  ✓ tui module imported")
     except Exception as e:
         print(f"  ✗ tui import failed: {e}")
@@ -81,6 +91,7 @@ async def test_tui_creation():
     except Exception as e:
         print(f"  ✗ TUI creation failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -107,6 +118,7 @@ async def test_session_store():
     except Exception as e:
         print(f"  ✗ SessionStore test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -142,13 +154,16 @@ async def test_run_tui_mode():
 
         # Check run_tui
         print(f"  ✓ run_tui is: {run_tui}")
-        print(f"  ✓ run_tui is coroutine function: {asyncio.iscoroutinefunction(run_tui)}")
+        print(
+            f"  ✓ run_tui is coroutine function: {asyncio.iscoroutinefunction(run_tui)}"
+        )
 
         return True
 
     except Exception as e:
         print(f"  ✗ run_tui_mode test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
