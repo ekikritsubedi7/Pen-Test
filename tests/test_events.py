@@ -1,6 +1,7 @@
 """Tests for event bus."""
 
 import pytest
+
 from pentestgpt.core.events import Event, EventBus, EventType
 
 

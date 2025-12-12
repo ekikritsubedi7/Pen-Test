@@ -1,6 +1,7 @@
 """Tests for backend interface and message types."""
 
 import pytest
+
 from pentestgpt.core.backend import AgentBackend, AgentMessage, MessageType
 
 

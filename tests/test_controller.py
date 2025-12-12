@@ -1,14 +1,14 @@
 """Tests for AgentController."""
 
-import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
-from pentestgpt.core.controller import AgentController, AgentState
+import pytest
+
 from pentestgpt.core.backend import AgentBackend, AgentMessage, MessageType
 from pentestgpt.core.config import PentestGPTConfig
+from pentestgpt.core.controller import AgentController, AgentState
 from pentestgpt.core.events import EventBus
 from pentestgpt.core.session import SessionStore
 
@@ -133,7 +133,6 @@ class TestAgentController:
     @pytest.mark.asyncio
     async def test_pause_and_resume(self, controller, mock_backend):
         """Test pause and resume functionality."""
-        messages_received = []
 
         async def slow_messages():
             for i in range(5):

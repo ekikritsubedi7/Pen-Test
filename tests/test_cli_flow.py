@@ -33,7 +33,7 @@ async def test_controller_creation():
 
     try:
         from pentestgpt.core.config import load_config
-        from pentestgpt.core.controller import AgentController, AgentState
+        from pentestgpt.core.controller import AgentController
 
         config = load_config(target="test.example.com")
         print(f"  ✓ Config created: {config}")
@@ -88,7 +88,7 @@ async def test_event_bus():
     print("\nTesting EventBus...")
 
     try:
-        from pentestgpt.core.events import EventBus, EventType, Event
+        from pentestgpt.core.events import EventBus, EventType
 
         bus = EventBus.get()
         print(f"  ✓ EventBus singleton: {bus}")

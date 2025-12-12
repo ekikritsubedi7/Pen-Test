@@ -1,10 +1,10 @@
 """Tests for session management."""
 
-import pytest
+import tempfile
 from datetime import datetime
 from pathlib import Path
-import tempfile
-import json
+
+import pytest
 
 from pentestgpt.core.session import SessionInfo, SessionStatus, SessionStore
 

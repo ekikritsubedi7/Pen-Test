@@ -12,35 +12,30 @@ async def test_imports():
     """Test if all imports work."""
     print("Step 1: Testing basic imports...")
     try:
-        from pentestgpt.core.session import SessionStore, SessionInfo, SessionStatus
         print("  ✓ session module imported")
     except Exception as e:
         print(f"  ✗ session import failed: {e}")
         return False
 
     try:
-        from pentestgpt.core.events import EventBus, EventType, Event
         print("  ✓ events module imported")
     except Exception as e:
         print(f"  ✗ events import failed: {e}")
         return False
 
     try:
-        from pentestgpt.core.backend import AgentBackend, ClaudeCodeBackend, AgentMessage, MessageType
         print("  ✓ backend module imported")
     except Exception as e:
         print(f"  ✗ backend import failed: {e}")
         return False
 
     try:
-        from pentestgpt.core.controller import AgentController, AgentState
         print("  ✓ controller module imported")
     except Exception as e:
         print(f"  ✗ controller import failed: {e}")
         return False
 
     try:
-        from pentestgpt.interface.tui import run_tui, PentestGPTApp
         print("  ✓ tui module imported")
     except Exception as e:
         print(f"  ✗ tui import failed: {e}")
@@ -92,7 +87,7 @@ async def test_session_store():
         from pentestgpt.core.session import SessionStore
 
         store = SessionStore()
-        print(f"  ✓ SessionStore created")
+        print("  ✓ SessionStore created")
 
         # List sessions (should work even if empty)
         sessions = store.list_sessions()
@@ -116,6 +111,7 @@ async def test_run_tui_mode():
     print("\nStep 4: Testing run_tui_mode flow...")
     try:
         from argparse import Namespace
+
         from pentestgpt.core.session import SessionStore
         from pentestgpt.interface.tui import run_tui
 
