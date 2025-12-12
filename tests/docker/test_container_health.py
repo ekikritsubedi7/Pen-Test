@@ -64,7 +64,9 @@ class TestContainerHealth:
             timeout=60,
         )
 
-    def _exec_in_container(self, container: str, command: str) -> subprocess.CompletedProcess:
+    def _exec_in_container(
+        self, container: str, command: str
+    ) -> subprocess.CompletedProcess:
         """Execute a command in the container."""
         return subprocess.run(
             ["docker", "exec", container, "bash", "-c", command],
@@ -76,7 +78,14 @@ class TestContainerHealth:
     def test_container_starts(self, running_container: str):
         """Test that the container starts successfully."""
         result = subprocess.run(
-            ["docker", "ps", "-f", f"name={running_container}", "--format", "{{.Status}}"],
+            [
+                "docker",
+                "ps",
+                "-f",
+                f"name={running_container}",
+                "--format",
+                "{{.Status}}",
+            ],
             capture_output=True,
             text=True,
             timeout=10,
@@ -86,7 +95,9 @@ class TestContainerHealth:
 
     def test_workspace_exists(self, running_container: str):
         """Test that /workspace directory exists."""
-        result = self._exec_in_container(running_container, "test -d /workspace && echo ok")
+        result = self._exec_in_container(
+            running_container, "test -d /workspace && echo ok"
+        )
         assert "ok" in result.stdout, "/workspace directory should exist"
 
     def test_python_installed(self, running_container: str):
@@ -160,7 +171,9 @@ class TestContainerHealth:
 
     def test_claude_code_available(self, running_container: str):
         """Test that Claude Code CLI is available."""
-        result = self._exec_in_container(running_container, "which claude || echo 'not found'")
+        result = self._exec_in_container(
+            running_container, "which claude || echo 'not found'"
+        )
         # Claude might not be installed in all environments, but check
         if "not found" in result.stdout:
             pytest.skip("Claude Code CLI not installed in container")

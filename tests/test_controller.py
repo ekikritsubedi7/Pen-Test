@@ -97,11 +97,15 @@ class TestAgentController:
     async def test_run_success(self, controller, mock_backend):
         """Test successful run."""
         # Set up messages
-        mock_backend.set_messages([
-            AgentMessage(type=MessageType.TEXT, content="Starting task..."),
-            AgentMessage(type=MessageType.TEXT, content="Found flag{test123}!"),
-            AgentMessage(type=MessageType.RESULT, content=None, metadata={"cost_usd": 0.5}),
-        ])
+        mock_backend.set_messages(
+            [
+                AgentMessage(type=MessageType.TEXT, content="Starting task..."),
+                AgentMessage(type=MessageType.TEXT, content="Found flag{test123}!"),
+                AgentMessage(
+                    type=MessageType.RESULT, content=None, metadata={"cost_usd": 0.5}
+                ),
+            ]
+        )
 
         result = await controller.run("Test task")
 
@@ -112,20 +116,22 @@ class TestAgentController:
     @pytest.mark.asyncio
     async def test_run_with_tool_messages(self, controller, mock_backend):
         """Test run with tool messages."""
-        mock_backend.set_messages([
-            AgentMessage(
-                type=MessageType.TOOL_START,
-                content=None,
-                tool_name="bash",
-                tool_args={"command": "nmap -sV target"},
-            ),
-            AgentMessage(
-                type=MessageType.TOOL_RESULT,
-                content="PORT STATE SERVICE\n22 open ssh",
-                tool_name="bash",
-            ),
-            AgentMessage(type=MessageType.RESULT, content=None, metadata={}),
-        ])
+        mock_backend.set_messages(
+            [
+                AgentMessage(
+                    type=MessageType.TOOL_START,
+                    content=None,
+                    tool_name="bash",
+                    tool_args={"command": "nmap -sV target"},
+                ),
+                AgentMessage(
+                    type=MessageType.TOOL_RESULT,
+                    content="PORT STATE SERVICE\n22 open ssh",
+                    tool_name="bash",
+                ),
+                AgentMessage(type=MessageType.RESULT, content=None, metadata={}),
+            ]
+        )
 
         result = await controller.run("Scan target")
         assert result["success"] is True
@@ -166,6 +172,7 @@ class TestAgentController:
     @pytest.mark.asyncio
     async def test_stop_during_run(self, controller, mock_backend):
         """Test stopping during run."""
+
         async def infinite_messages():
             i = 0
             while True:
@@ -188,12 +195,17 @@ class TestAgentController:
     @pytest.mark.asyncio
     async def test_flag_detection(self, controller, mock_backend):
         """Test flag detection patterns."""
-        mock_backend.set_messages([
-            AgentMessage(type=MessageType.TEXT, content="Found flag{abc123}"),
-            AgentMessage(type=MessageType.TEXT, content="Also HTB{test_flag}"),
-            AgentMessage(type=MessageType.TEXT, content="And 0123456789abcdef0123456789abcdef"),
-            AgentMessage(type=MessageType.RESULT, content=None, metadata={}),
-        ])
+        mock_backend.set_messages(
+            [
+                AgentMessage(type=MessageType.TEXT, content="Found flag{abc123}"),
+                AgentMessage(type=MessageType.TEXT, content="Also HTB{test_flag}"),
+                AgentMessage(
+                    type=MessageType.TEXT,
+                    content="And 0123456789abcdef0123456789abcdef",
+                ),
+                AgentMessage(type=MessageType.RESULT, content=None, metadata={}),
+            ]
+        )
 
         result = await controller.run("Find flags")
 
@@ -211,6 +223,7 @@ class TestAgentController:
     @pytest.mark.asyncio
     async def test_backend_error(self, controller, mock_backend):
         """Test handling backend errors."""
+
         async def error_messages():
             raise Exception("Backend error")
             yield  # Make it a generator
