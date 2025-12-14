@@ -83,6 +83,7 @@ ENV PATH="/home/pentester/.local/bin:$PATH"
 COPY --chown=pentester:pentester pyproject.toml README.md /app/
 COPY --chown=pentester:pentester pentestgpt/ /app/pentestgpt/
 COPY --chown=pentester:pentester scripts/entrypoint.sh /home/pentester/entrypoint.sh
+COPY --chown=pentester:pentester scripts/ccr-config-template.json /app/scripts/ccr-config-template.json
 
 # Install Python dependencies as root to system Python
 # Allow pip to override system packages in Docker

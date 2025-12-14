@@ -78,10 +78,11 @@
 ### Prerequisites
 
 - **Docker** (required) - [Install Docker](https://docs.docker.com/get-docker/)
-- **Claude Model** (prioritized) - PentestGPT is optimized for Claude models via:
+- **LLM Provider** (choose one):
   - Anthropic API Key from [console.anthropic.com](https://console.anthropic.com/)
   - Claude OAuth Login (requires Claude subscription)
   - OpenRouter for alternative models at [openrouter.ai](https://openrouter.ai/keys)
+  - Local LLM via LM Studio, Ollama, or compatible server (see [Using Local LLMs](#using-local-llms))
 
 ### Installation
 
@@ -139,6 +140,52 @@ pentestgpt --target 10.10.11.50 --instruction "WordPress site, focus on plugin v
 ```
 
 **Keyboard Shortcuts:** `F1` Help | `Ctrl+P` Pause/Resume | `Ctrl+Q` Quit
+
+---
+
+## Using Local LLMs
+
+PentestGPT supports routing requests to local LLM servers (LM Studio, Ollama, text-generation-webui, etc.) running on your host machine.
+
+### Prerequisites
+
+- Local LLM server with an OpenAI-compatible API endpoint
+  - **LM Studio**: Enable server mode (default port 1234)
+  - **Ollama**: Run `ollama serve` (default port 11434)
+
+### Setup
+
+```bash
+# Configure PentestGPT for local LLM
+make config
+# Select option 4: Local LLM
+
+# Start your local LLM server on the host machine
+# Then connect to the container
+make connect
+```
+
+### Customizing Models
+
+Edit `scripts/ccr-config-template.json` to customize:
+
+- **`localLLM.api_base_url`**: Your LLM server URL (default: `host.docker.internal:1234`)
+- **`localLLM.models`**: Available model names on your server
+- **Router section**: Which models handle which operations
+
+| Route | Purpose | Default Model |
+|-------|---------|---------------|
+| `default` | General tasks | openai/gpt-oss-20b |
+| `background` | Background operations | openai/gpt-oss-20b |
+| `think` | Reasoning-heavy tasks | qwen/qwen3-coder-30b |
+| `longContext` | Large context handling | qwen/qwen3-coder-30b |
+| `webSearch` | Web search operations | openai/gpt-oss-20b |
+
+### Troubleshooting
+
+- **Connection refused**: Ensure your LLM server is running and listening on the configured port
+- **Docker networking**: Use `host.docker.internal` (not `localhost`) to access host services from Docker
+- **Check CCR logs**: Inside the container, run `cat /tmp/ccr.log`
 
 ---
 

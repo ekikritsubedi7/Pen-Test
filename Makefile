@@ -13,7 +13,7 @@ help:
 	@echo "Docker Workflow (Primary Usage):"
 	@echo "  make install         Install dependencies (uv sync) and build Docker image"
 	@echo "  make config          Configure authentication (interactive)"
-	@echo "                       Options: OpenRouter, Anthropic API, Manual Login"
+	@echo "                       Options: Claude Login, OpenRouter, Anthropic API, Local LLM"
 	@echo "  make connect         Connect to container (main entry point)"
 	@echo "  make start           Start container in background"
 	@echo "  make stop            Stop container (keeps config)"
