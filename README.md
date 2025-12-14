@@ -122,6 +122,7 @@ pentestgpt --target http://host.docker.internal:8000
 | `make stop` | Stop container (config persists) |
 | `make clean-docker` | Remove everything including config |
 
+
 ---
 
 ## Usage
