@@ -78,11 +78,12 @@
 ### Prerequisites
 
 - **Docker** (required) - [Install Docker](https://docs.docker.com/get-docker/)
-- **Claude Model** (prioritized) - PentestGPT is optimized for Claude models via:
+- **LLM Provider** (choose one):
   - Anthropic API Key from [console.anthropic.com](https://console.anthropic.com/)
   - Claude OAuth Login (requires Claude subscription)
   - OpenRouter for alternative models at [openrouter.ai](https://openrouter.ai/keys)
   - [Tutorial: Using Local Models with Claude Code](https://docs.google.com/document/d/1ixK7x-wlr5t5TYZJdfm75UME5KnPCpS46boLkUXKg1w/edit?usp=sharing)
+
 
 ### Installation
 
@@ -143,6 +144,52 @@ pentestgpt --target 10.10.11.50 --instruction "WordPress site, focus on plugin v
 
 ---
 
+## Using Local LLMs
+
+PentestGPT supports routing requests to local LLM servers (LM Studio, Ollama, text-generation-webui, etc.) running on your host machine.
+
+### Prerequisites
+
+- Local LLM server with an OpenAI-compatible API endpoint
+  - **LM Studio**: Enable server mode (default port 1234)
+  - **Ollama**: Run `ollama serve` (default port 11434)
+
+### Setup
+
+```bash
+# Configure PentestGPT for local LLM
+make config
+# Select option 4: Local LLM
+
+# Start your local LLM server on the host machine
+# Then connect to the container
+make connect
+```
+
+### Customizing Models
+
+Edit `scripts/ccr-config-template.json` to customize:
+
+- **`localLLM.api_base_url`**: Your LLM server URL (default: `host.docker.internal:1234`)
+- **`localLLM.models`**: Available model names on your server
+- **Router section**: Which models handle which operations
+
+| Route | Purpose | Default Model |
+|-------|---------|---------------|
+| `default` | General tasks | openai/gpt-oss-20b |
+| `background` | Background operations | openai/gpt-oss-20b |
+| `think` | Reasoning-heavy tasks | qwen/qwen3-coder-30b |
+| `longContext` | Large context handling | qwen/qwen3-coder-30b |
+| `webSearch` | Web search operations | openai/gpt-oss-20b |
+
+### Troubleshooting
+
+- **Connection refused**: Ensure your LLM server is running and listening on the configured port
+- **Docker networking**: Use `host.docker.internal` (not `localhost`) to access host services from Docker
+- **Check CCR logs**: Inside the container, run `cat /tmp/ccr.log`
+
+---
+
 ## Telemetry
 
 PentestGPT collects anonymous usage data to help improve the tool. This data is sent to our [Langfuse](https://langfuse.com) project and includes:
@@ -187,6 +234,7 @@ pentestgpt-benchmark stop XBEN-037-24        # Stop a benchmark
 
 - **uv** (required) - Python package manager: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - **Claude Code CLI** - Configure with `claude login` or `export ANTHROPIC_API_KEY='your-key'`
+  - [Tutorial: Using Local Models with Claude Code](https://docs.google.com/document/d/1ixK7x-wlr5t5TYZJdfm75UME5KnPCpS46boLkUXKg1w/edit?usp=sharing)
 
 ### Local Development
 
