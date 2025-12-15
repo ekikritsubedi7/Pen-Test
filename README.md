@@ -82,6 +82,7 @@
   - Anthropic API Key from [console.anthropic.com](https://console.anthropic.com/)
   - Claude OAuth Login (requires Claude subscription)
   - OpenRouter for alternative models at [openrouter.ai](https://openrouter.ai/keys)
+  - [Tutorial: Using Local Models with Claude Code](https://docs.google.com/document/d/1ixK7x-wlr5t5TYZJdfm75UME5KnPCpS46boLkUXKg1w/edit?usp=sharing)
 
 ### Installation
 
@@ -186,7 +187,6 @@ pentestgpt-benchmark stop XBEN-037-24        # Stop a benchmark
 
 - **uv** (required) - Python package manager: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - **Claude Code CLI** - Configure with `claude login` or `export ANTHROPIC_API_KEY='your-key'`
-  - [Tutorial: Using Local Models with Claude Code](https://docs.google.com/document/d/1ixK7x-wlr5t5TYZJdfm75UME5KnPCpS46boLkUXKg1w/edit?usp=sharing)
 
 ### Local Development
 
