@@ -21,6 +21,9 @@
     <strong>Published at USENIX Security 2024</strong>
     <br />
     <br />
+    <a href="https://pentestgpt.com"><strong>Official Website: pentestgpt.com »</strong></a>
+    <br />
+    <br />
     <a href="https://www.usenix.org/conference/usenixsecurity24/presentation/deng">Research Paper</a>
     ·
     <a href="https://github.com/GreyDGL/PentestGPT/issues">Report Bug</a>
@@ -31,11 +34,6 @@
 
 <!-- ABOUT THE PROJECT -->
 <a href="https://trendshift.io/repositories/3770" target="_blank"><img src="https://trendshift.io/api/badge/repositories/3770" alt="GreyDGL%2FPentestGPT | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-
-> [!WARNING]
-> **PentestGPT is a research prototype only**
->
-> PentestGPT is a research prototype that pioneered the use of GenAI in cybersecurity. Please be aware of third-party services claiming to offer paid PentestGPT products - the original project is free and open-source.
 
 ---
 
@@ -105,7 +103,7 @@ make connect
 ### Try a Benchmark
 
 ```bash
-uv run pentestgpt-benchmark start XBEN-037-24 
+uv run pentestgpt-benchmark start XBEN-037-24
 ```
 
 Then connect into the container and run:
@@ -113,67 +111,6 @@ Then connect into the container and run:
 ```bash
 pentestgpt --target http://host.docker.internal:8000
 ```
-
-### Automated Benchmark Testing (on xbow validation benchmark)
-
-For comprehensive automated testing, use the standalone benchmark runner.
-
-**Setup** (one-time):
-
-```bash
-# Clone the benchmark submodule if you haven't already
-git submodule update --init --recursive
-
-# Navigate to the runner
-cd benchmark/standalone-xbow-benchmark-runner
-```
-
-**Usage**:
-
-```bash
-# Preview what will be executed (recommended first step)
-python3 run_benchmarks.py --dry-run --range 1-5 --pattern-flag
-
-# Run a single benchmark with strict flag validation
-python3 run_benchmarks.py --range 1-1 --pattern-flag
-
-# Run multiple benchmarks
-python3 run_benchmarks.py --range 1-10 --pattern-flag
-
-# Run all 104 benchmarks
-python3 run_benchmarks.py --all --pattern-flag
-
-# Run with extended 30-minute timeout for harder benchmarks (default timeout is 15-minute)
-python3 run_benchmarks.py --range 1-10 --pattern-flag --timeout 1800
-
-# See all options
-python3 run_benchmarks.py --help
-```
-
-**Tip**: Always run `--dry-run` first to verify configuration before starting long benchmark runs.
-
-The standalone runner provides:
-- **Automated execution**: Headless benchmark testing via Docker
-- **Comprehensive logging**: Per-benchmark logs and summary reports
-- **Flag verification**: Automatic detection and validation
-- **Resumption support**: Resume interrupted runs with `--resume`
-- **Cost tracking**: API cost and time analysis
-
-See the [standalone benchmark runner README](benchmark/standalone-xbow-benchmark-runner/README.md) for detailed usage.
-
-#### December 2025 Benchmark Results
-
-PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW validation suite:
-
-- **Cost**: Average $1.11, Median $0.42 per successful benchmark
-- **Time (30 minutes timeout)**: Average 6.1 minutes, Median 3.3 minutes per successful benchmark
-- **Success rates by difficulty**:
-  - Level 1: 91.1%
-  - Level 2: 74.5%
-  - Level 3: 62.5%
-- **Total cost**: $126.65 across all runs
-
-View the full analysis with cost breakdowns, vulnerability category performance, and recommendations in [Dec 2025 Results](benchmark/standalone-xbow-benchmark-runner/results/dec-2025.md).
 
 ### Commands Reference
 
@@ -274,7 +211,7 @@ export LANGFUSE_ENABLED=false
 
 ## Benchmarks
 
-PentestGPT includes 100+ vulnerability challenges for testing and development.
+PentestGPT includes 104 XBOW validation benchmarks for comprehensive testing and evaluation.
 
 ```bash
 pentestgpt-benchmark list                    # List all benchmarks
@@ -287,32 +224,18 @@ pentestgpt-benchmark stop XBEN-037-24        # Stop a benchmark
 
 **Available Tags:** `sqli`, `xss`, `idor`, `ssti`, `ssrf`, `lfi`, `rce`
 
----
+### Performance Highlights
 
-## Development
+PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW validation suite:
 
-### Prerequisites
+- **Cost**: Average $1.11, Median $0.42 per successful benchmark
+- **Time**: Average 6.1 minutes, Median 3.3 minutes per successful benchmark
+- **Success rates by difficulty**:
+  - Level 1: 91.1%
+  - Level 2: 74.5%
+  - Level 3: 62.5%
 
-- **uv** (required) - Python package manager: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- **Claude Code CLI** - Configure with `claude login` or `export ANTHROPIC_API_KEY='your-key'`
-  - [Tutorial: Using Local Models with Claude Code](https://docs.google.com/document/d/1ixK7x-wlr5t5TYZJdfm75UME5KnPCpS46boLkUXKg1w/edit?usp=sharing)
-
-### Local Development
-
-```bash
-uv sync                                      # Install dependencies
-uv run pentestgpt --target 10.10.11.234      # Run locally
-```
-
-### Project Commands
-
-```bash
-make test          # Run pytest
-make lint          # Run ruff linter
-make typecheck     # Run mypy
-make ci            # Run full CI simulation (lint, format, typecheck, test, build)
-make ci-quick      # Quick CI without build step
-```
+For detailed benchmark results, analysis, and automated testing instructions, see the **[Benchmark Documentation](benchmark/README.md)**.
 
 ---
 
@@ -352,16 +275,6 @@ If you use PentestGPT in your research, please cite our paper:
 Distributed under the MIT License. See `LICENSE.md` for more information.
 
 **Disclaimer**: This tool is for educational purposes and authorized security testing only. The authors do not condone any illegal use. Use at your own risk.
-
----
-
-## Contact
-
-- **Gelei Deng** - [![LinkedIn][linkedin-shield]][linkedin-url] - gelei.deng@ntu.edu.sg
-- **Yi Liu** - yi009@e.ntu.edu.sg
-- **Yuekang Li** - yuekang.li@unsw.edu.au
-- **Víctor Mayoral Vilches** - [![LinkedIn][linkedin-shield]][linkedin-url2] - v.mayoralv@gmail.com
-- **Peng Liu** - liu_peng@i2r.a-star.edu.sg
 
 ---
 
