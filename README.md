@@ -114,6 +114,67 @@ Then connect into the container and run:
 pentestgpt --target http://host.docker.internal:8000
 ```
 
+### Automated Benchmark Testing (on xbow validation benchmark)
+
+For comprehensive automated testing, use the standalone benchmark runner.
+
+**Setup** (one-time):
+
+```bash
+# Clone the benchmark submodule if you haven't already
+git submodule update --init --recursive
+
+# Navigate to the runner
+cd benchmark/standalone-xbow-benchmark-runner
+```
+
+**Usage**:
+
+```bash
+# Preview what will be executed (recommended first step)
+python3 run_benchmarks.py --dry-run --range 1-5 --pattern-flag
+
+# Run a single benchmark with strict flag validation
+python3 run_benchmarks.py --range 1-1 --pattern-flag
+
+# Run multiple benchmarks
+python3 run_benchmarks.py --range 1-10 --pattern-flag
+
+# Run all 104 benchmarks
+python3 run_benchmarks.py --all --pattern-flag
+
+# Run with extended 30-minute timeout for harder benchmarks (default timeout is 15-minute)
+python3 run_benchmarks.py --range 1-10 --pattern-flag --timeout 1800
+
+# See all options
+python3 run_benchmarks.py --help
+```
+
+**Tip**: Always run `--dry-run` first to verify configuration before starting long benchmark runs.
+
+The standalone runner provides:
+- **Automated execution**: Headless benchmark testing via Docker
+- **Comprehensive logging**: Per-benchmark logs and summary reports
+- **Flag verification**: Automatic detection and validation
+- **Resumption support**: Resume interrupted runs with `--resume`
+- **Cost tracking**: API cost and time analysis
+
+See the [standalone benchmark runner README](benchmark/standalone-xbow-benchmark-runner/README.md) for detailed usage.
+
+#### December 2025 Benchmark Results
+
+PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW validation suite:
+
+- **Cost**: Average $1.11, Median $0.42 per successful benchmark
+- **Time (30 minutes timeout)**: Average 6.1 minutes, Median 3.3 minutes per successful benchmark
+- **Success rates by difficulty**:
+  - Level 1: 91.1%
+  - Level 2: 74.5%
+  - Level 3: 62.5%
+- **Total cost**: $126.65 across all runs
+
+View the full analysis with cost breakdowns, vulnerability category performance, and recommendations in [Dec 2025 Results](benchmark/standalone-xbow-benchmark-runner/results/dec-2025.md).
+
 ### Commands Reference
 
 | Command | Description |
