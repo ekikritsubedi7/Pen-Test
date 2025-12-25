@@ -103,14 +103,11 @@ make connect
 ### Try a Benchmark
 
 ```bash
-uv run pentestgpt-benchmark start XBEN-037-24
+cd benchmark/standalone-xbow-benchmark-runner
+python3 run_benchmarks.py --range 1-1 --pattern-flag
 ```
 
-Then connect into the container and run:
-
-```bash
-pentestgpt --target http://host.docker.internal:8000
-```
+See [Benchmark Documentation](benchmark/README.md) for detailed usage.
 
 ### Commands Reference
 
@@ -214,15 +211,13 @@ export LANGFUSE_ENABLED=false
 PentestGPT includes 104 XBOW validation benchmarks for comprehensive testing and evaluation.
 
 ```bash
-pentestgpt-benchmark list                    # List all benchmarks
-pentestgpt-benchmark list --levels 1         # Filter by difficulty
-pentestgpt-benchmark list --tags sqli        # Filter by vulnerability type
-pentestgpt-benchmark start XBEN-037-24       # Start a benchmark
-pentestgpt-benchmark status                  # Check running benchmarks
-pentestgpt-benchmark stop XBEN-037-24        # Stop a benchmark
-```
+cd benchmark/standalone-xbow-benchmark-runner
 
-**Available Tags:** `sqli`, `xss`, `idor`, `ssti`, `ssrf`, `lfi`, `rce`
+python3 run_benchmarks.py --range 1-10 --pattern-flag   # Run benchmarks 1-10
+python3 run_benchmarks.py --all --pattern-flag          # Run all 104 benchmarks
+python3 run_benchmarks.py --retry-failed                # Retry failed benchmarks
+python3 run_benchmarks.py --dry-run --range 1-5         # Preview without executing
+```
 
 ### Performance Highlights
 

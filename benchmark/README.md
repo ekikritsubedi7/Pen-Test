@@ -63,93 +63,28 @@ The XBOW benchmarks cover the following vulnerability types:
 
 ## Running Benchmarks
 
-### Basic Commands
+Use the standalone benchmark runner for all benchmark testing:
 
 ```bash
-# List all available benchmarks
-pentestgpt-benchmark list
+cd standalone-xbow-benchmark-runner
 
-# Filter by difficulty level (1, 2, or 3)
-pentestgpt-benchmark list --levels 1
-
-# Filter by vulnerability tag
-pentestgpt-benchmark list --tags sqli
-
-# Show all tags for each benchmark
-pentestgpt-benchmark list --show-tags
-
-# Start a specific benchmark
-pentestgpt-benchmark start XBEN-001-24
-
-# Check running benchmarks
-pentestgpt-benchmark status
-
-# Stop a benchmark
-pentestgpt-benchmark stop XBEN-001-24
-```
-
-### Manual Testing Workflow
-
-1. Start a benchmark container:
-```bash
-pentestgpt-benchmark start XBEN-037-24
-# Container will be accessible at http://0.0.0.0:<port>
-```
-
-2. Connect to PentestGPT container:
-```bash
-make connect
-```
-
-3. Run PentestGPT against the benchmark:
-```bash
-pentestgpt --target http://host.docker.internal:<port>
-```
-
-4. Clean up when done:
-```bash
-pentestgpt-benchmark stop XBEN-037-24
-```
-
----
-
-## Automated Testing
-
-For comprehensive automated testing, use the standalone benchmark runner.
-
-### Setup
-
-```bash
-# Navigate to the runner directory
-cd benchmark/standalone-xbow-benchmark-runner
-
-# Ensure Docker is running
-docker ps
-```
-
-### Usage
-
-```bash
-# Preview what will be executed (recommended first step)
+# Preview what will be executed
 python3 run_benchmarks.py --dry-run --range 1-5 --pattern-flag
 
-# Run a single benchmark with strict flag validation
-python3 run_benchmarks.py --range 1-1 --pattern-flag
+# Run benchmarks
+python3 run_benchmarks.py --range 1-10 --pattern-flag    # Range of benchmarks
+python3 run_benchmarks.py --all --pattern-flag           # All 104 benchmarks
+python3 run_benchmarks.py --retry-failed                 # Retry failed only
 
-# Run multiple benchmarks
-python3 run_benchmarks.py --range 1-10 --pattern-flag
+# Model selection
+python3 run_benchmarks.py --range 1-10 --model opus      # Use Claude Opus
+python3 run_benchmarks.py --range 1-10 --model haiku     # Use Claude Haiku
 
-# Run all 104 benchmarks
-python3 run_benchmarks.py --all --pattern-flag
-
-# Run with extended timeout (default is 15 minutes)
-python3 run_benchmarks.py --range 1-10 --pattern-flag --timeout 1800
+# Extended timeout (default: 15 minutes)
+python3 run_benchmarks.py --range 1-10 --timeout 1800
 
 # Resume interrupted run
 python3 run_benchmarks.py --resume --pattern-flag
-
-# See all options
-python3 run_benchmarks.py --help
 ```
 
 ### Features
@@ -159,9 +94,8 @@ python3 run_benchmarks.py --help
 - **Flag verification**: Automatic detection and validation using regex patterns
 - **Resumption support**: Resume interrupted runs without re-running completed benchmarks
 - **Cost tracking**: API cost and execution time analysis
-- **Summary reports**: Detailed results with success rates, costs, and timing statistics
 
-See [standalone-xbow-benchmark-runner/README.md](standalone-xbow-benchmark-runner/README.md) for detailed usage instructions.
+See [standalone-xbow-benchmark-runner/README.md](standalone-xbow-benchmark-runner/README.md) for detailed usage.
 
 ---
 
