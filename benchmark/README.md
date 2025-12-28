@@ -10,6 +10,8 @@ This directory contains benchmark suites for evaluating PentestGPT's automated p
 
 - [Overview](#overview)
 - [Supported Benchmarks](#supported-benchmarks)
+  - [USENIX Security 2024 Paper Benchmark](#usenix-security-2024-paper-benchmark)
+  - [XBOW Validation Benchmarks](#xbow-validation-benchmarks)
 - [Running Benchmarks](#running-benchmarks)
 - [Automated Testing](#automated-testing)
 - [Performance Results](#performance-results)
@@ -26,7 +28,39 @@ The PentestGPT benchmark system provides a framework for evaluating automated pe
 
 ## Supported Benchmarks
 
-### XBOW Validation Benchmarks 
+### USENIX Security 2024 Paper Benchmark
+
+The original benchmark from the USENIX Security 2024 paper evaluates PentestGPT on real-world penetration testing targets from HackTheBox and VulnHub platforms.
+
+#### Statistics
+
+- **Total Targets**: 13 (from HackTheBox and VulnHub)
+- **Total Sub-tasks**: 182
+- **Vulnerability Coverage**: OWASP Top 10
+- **Evaluation**: Compared against GPT-3.5, GPT-4, Bard, and human expert testers (OSCP certified)
+
+#### Resources
+
+- **Artifact Branch**: [github.com/GreyDGL/PentestGPT/tree/artifact](https://github.com/GreyDGL/PentestGPT/tree/artifact)
+- **Benchmark Spreadsheet**: [Google Sheets - Complete Benchmark Data](https://docs.google.com/spreadsheets/d/1FpyMf91DDsnynkIvQXph_hmzPyCvXQW_aC5SKgF1lGk/edit?usp=sharing)
+- **Research Paper**: [USENIX Security 2024](https://www.usenix.org/conference/usenixsecurity24/presentation/deng)
+
+#### Key Results
+
+- PentestGPT outperformed standalone LLMs with a **228.6% task-completion increase** compared to GPT-3.5
+- Won the **Distinguished Artifact Award** at USENIX Security 2024
+
+#### Sample Targets
+
+Includes targets from:
+- **VulnHub**: DeathNote, Hackable-II, Kioptrix Level 1
+- **HackTheBox**: Various CTF challenges (Templated, Precious, Phonebook, etc.)
+
+For detailed target definitions and evaluation methodology, see the [artifact branch](https://github.com/GreyDGL/PentestGPT/tree/artifact) and [benchmark spreadsheet](https://docs.google.com/spreadsheets/d/1FpyMf91DDsnynkIvQXph_hmzPyCvXQW_aC5SKgF1lGk/edit?usp=sharing).
+
+---
+
+### XBOW Validation Benchmarks
 
 The XBOW validation benchmark suite is the first benchmark suite supported by PentestGPT. It provides a comprehensive set of 104 vulnerability challenges designed to test automated penetration testing capabilities.
 
