@@ -378,9 +378,7 @@ class TestLangfuseIntegration:
         }
 
         # Complete session without any tools
-        langfuse_module._handle_state(
-            Event(EventType.STATE_CHANGED, {"state": "completed"})
-        )
+        langfuse_module._handle_state(Event(EventType.STATE_CHANGED, {"state": "completed"}))
 
         # No span should have been created
         mock_client.start_span.assert_not_called()
