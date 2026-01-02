@@ -14,6 +14,11 @@ services:
       - ccr-config:/home/pentester/.claude-code-router
     stdin_open: true
     tty: true
+    # Required for OpenVPN (HackTheBox/TryHackMe connectivity)
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
     # Use host network for easy access to benchmark containers
     extra_hosts:
       - "host.docker.internal:host-gateway"

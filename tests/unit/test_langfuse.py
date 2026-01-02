@@ -153,8 +153,8 @@ class TestLangfuseIntegration:
         langfuse_module._handle_tool(Event(EventType.TOOL, {"status": "start", "name": "bash"}))
         langfuse_module._handle_flag(Event(EventType.FLAG_FOUND, {"flag": "test"}))
 
-    def test_state_handler_creates_span_on_running(self):
-        """Test that state handler creates a span when state is 'running' (v3 API)."""
+    def test_state_handler_stores_pending_session_on_running(self):
+        """Test that state handler stores pending session data on 'running' state (deferred creation)."""
         import importlib
 
         import pentestgpt.core.langfuse as langfuse_module
@@ -162,33 +162,78 @@ class TestLangfuseIntegration:
         importlib.reload(langfuse_module)
 
         mock_client = MagicMock()
-        mock_span = MagicMock()
-        mock_client.start_span.return_value = mock_span
-
         langfuse_module._langfuse_client = mock_client
         langfuse_module._current_span = None
         langfuse_module._user_id = "test-user-id-1234"
 
         langfuse_module._handle_state(
+            Event(
+                EventType.STATE_CHANGED,
+                {"state": "running", "target": "10.10.11.234", "task": "Solve CTF"},
+            )
+        )
+
+        # Span should NOT be created yet (deferred until first tool)
+        mock_client.start_span.assert_not_called()
+        assert langfuse_module._current_span is None
+
+        # Pending session should be stored
+        assert langfuse_module._pending_session is not None
+        assert langfuse_module._pending_session["target"] == "10.10.11.234"
+        assert langfuse_module._pending_session["task"] == "Solve CTF"
+        assert "session_id" in langfuse_module._pending_session
+
+    def test_state_handler_uses_target_field(self):
+        """Test that state handler uses the new target field when provided."""
+        import importlib
+
+        import pentestgpt.core.langfuse as langfuse_module
+
+        importlib.reload(langfuse_module)
+
+        mock_client = MagicMock()
+        langfuse_module._langfuse_client = mock_client
+        langfuse_module._current_span = None
+        langfuse_module._user_id = "test-user-id-1234"
+
+        langfuse_module._handle_state(
+            Event(
+                EventType.STATE_CHANGED,
+                {
+                    "state": "running",
+                    "details": "Connecting...",
+                    "target": "10.10.11.234",
+                    "task": "My task",
+                },
+            )
+        )
+
+        # Should use target field, not details
+        assert langfuse_module._session_target == "10.10.11.234"
+        assert langfuse_module._pending_session["target"] == "10.10.11.234"
+        assert langfuse_module._pending_session["task"] == "My task"
+
+    def test_state_handler_backward_compatible_with_details_only(self):
+        """Test that state handler falls back to details if target not provided."""
+        import importlib
+
+        import pentestgpt.core.langfuse as langfuse_module
+
+        importlib.reload(langfuse_module)
+
+        mock_client = MagicMock()
+        langfuse_module._langfuse_client = mock_client
+        langfuse_module._current_span = None
+        langfuse_module._user_id = "test-user-id-1234"
+
+        # Old-style event without target field
+        langfuse_module._handle_state(
             Event(EventType.STATE_CHANGED, {"state": "running", "details": "10.10.11.234"})
         )
 
-        # Verify start_span was called with correct parameters
-        call_kwargs = mock_client.start_span.call_args.kwargs
-        assert call_kwargs["name"] == "pentestgpt:10.10.11.234"
-        assert call_kwargs["input"]["target"] == "10.10.11.234"
-        assert call_kwargs["metadata"]["user_id"] == "test-user-id-1234"
-        assert "session_id" in call_kwargs["metadata"]
-
-        # Verify update_trace was called for user_id and session_id
-        mock_span.update_trace.assert_called_once()
-        trace_kwargs = mock_span.update_trace.call_args.kwargs
-        assert trace_kwargs["user_id"] == "test-user-id-1234"
-        assert "session_id" in trace_kwargs
-
-        # Verify flush was called immediately after span creation
-        assert mock_client.flush.called
-        assert langfuse_module._current_span is mock_span
+        # Should fall back to details as target
+        assert langfuse_module._session_target == "10.10.11.234"
+        assert langfuse_module._pending_session["target"] == "10.10.11.234"
 
     def test_state_handler_ends_span_on_completed(self):
         """Test that state handler ends span and flushes on completion (v3 API)."""
@@ -242,8 +287,52 @@ class TestLangfuseIntegration:
         )
         mock_nested_span.end.assert_called_once()
 
-    def test_tool_handler_creates_nested_span_on_start(self):
-        """Test that tool handler creates a nested span on tool start (v3 API)."""
+    def test_tool_handler_creates_session_span_on_first_tool(self):
+        """Test that tool handler creates session span on first tool (deferred creation)."""
+        import importlib
+
+        import pentestgpt.core.langfuse as langfuse_module
+
+        importlib.reload(langfuse_module)
+
+        mock_client = MagicMock()
+        mock_session_span = MagicMock()
+        mock_tool_span = MagicMock()
+        mock_client.start_span.return_value = mock_session_span
+        mock_session_span.start_span.return_value = mock_tool_span
+
+        langfuse_module._langfuse_client = mock_client
+        langfuse_module._current_span = None
+        langfuse_module._user_id = "test-user-id-1234"
+        langfuse_module._pending_session = {
+            "target": "10.10.11.234",
+            "task": "Solve CTF",
+            "session_id": "test-1234-session",
+        }
+
+        langfuse_module._handle_tool(
+            Event(EventType.TOOL, {"status": "start", "name": "bash", "args": {"cmd": "ls"}})
+        )
+
+        # Session span should now be created
+        mock_client.start_span.assert_called_once()
+        call_kwargs = mock_client.start_span.call_args.kwargs
+        assert call_kwargs["name"] == "pentestgpt:10.10.11.234"
+        assert call_kwargs["input"]["target"] == "10.10.11.234"
+        assert call_kwargs["input"]["task"] == "Solve CTF"
+        assert call_kwargs["metadata"]["task"] == "Solve CTF"
+
+        # Pending session should be cleared
+        assert langfuse_module._pending_session is None
+        assert langfuse_module._tool_executed is True
+        assert langfuse_module._current_span is mock_session_span
+
+        # Tool span should be created as nested span
+        mock_session_span.start_span.assert_called_once()
+        mock_tool_span.end.assert_called_once()
+
+    def test_tool_handler_creates_nested_span_when_span_exists(self):
+        """Test that tool handler creates nested span when session span already exists."""
         import importlib
 
         import pentestgpt.core.langfuse as langfuse_module
@@ -257,6 +346,7 @@ class TestLangfuseIntegration:
 
         langfuse_module._langfuse_client = mock_client
         langfuse_module._current_span = mock_span
+        langfuse_module._pending_session = None  # Already processed
 
         langfuse_module._handle_tool(
             Event(EventType.TOOL, {"status": "start", "name": "bash", "args": {"cmd": "ls"}})
@@ -268,6 +358,38 @@ class TestLangfuseIntegration:
             metadata={"tool_name": "bash"},
         )
         mock_nested_span.end.assert_called_once()
+
+    def test_session_discarded_if_no_tools_executed(self):
+        """Test that session is discarded if completed without any tool execution."""
+        import importlib
+
+        import pentestgpt.core.langfuse as langfuse_module
+
+        importlib.reload(langfuse_module)
+
+        mock_client = MagicMock()
+        langfuse_module._langfuse_client = mock_client
+        langfuse_module._current_span = None  # No span created
+        langfuse_module._session_target = "10.10.11.234"
+        langfuse_module._pending_session = {
+            "target": "10.10.11.234",
+            "task": "Solve CTF",
+            "session_id": "test-session",
+        }
+
+        # Complete session without any tools
+        langfuse_module._handle_state(
+            Event(EventType.STATE_CHANGED, {"state": "completed"})
+        )
+
+        # No span should have been created
+        mock_client.start_span.assert_not_called()
+        mock_client.flush.assert_not_called()
+
+        # State should be reset
+        assert langfuse_module._pending_session is None
+        assert langfuse_module._session_target is None
+        assert langfuse_module._current_span is None
 
     def test_flag_handler_creates_nested_span(self):
         """Test that flag handler creates a nested span (v3 API)."""
@@ -316,9 +438,71 @@ class TestLangfuseIntegration:
         # Subscribe to events
         langfuse_module._subscribe_to_events()
 
-        # Emit events via EventBus
+        # Emit running state via EventBus (should create pending session, not span)
         bus = EventBus.get()
-        bus.emit_state("running", "Test session")
+        bus.emit_state("running", "Connecting...", target="10.10.11.234", task="Test task")
 
-        # Verify span was created via EventBus subscription
+        # Span should NOT be created yet (deferred)
+        mock_client.start_span.assert_not_called()
+        assert langfuse_module._pending_session is not None
+        assert langfuse_module._pending_session["target"] == "10.10.11.234"
+
+        # Emit tool event - this should create the span
+        bus.emit_tool("start", "bash", {"cmd": "ls"})
+
+        # Now span should be created
         mock_client.start_span.assert_called()
+
+    def test_langfuse_loggers_silenced(self):
+        """Test that noisy loggers are silenced during init."""
+        import importlib
+        import logging
+
+        import pentestgpt.core.langfuse as langfuse_module
+
+        importlib.reload(langfuse_module)
+
+        # Call the silence function
+        langfuse_module._silence_langfuse_loggers()
+
+        # Check that noisy loggers are silenced
+        noisy_loggers = [
+            "langfuse",
+            "opentelemetry",
+            "opentelemetry.sdk",
+            "opentelemetry.sdk._shared_internal",
+        ]
+
+        for logger_name in noisy_loggers:
+            test_logger = logging.getLogger(logger_name)
+            # Logger should be at CRITICAL+1 level (effectively silenced)
+            assert test_logger.level > logging.CRITICAL
+            # Propagate should be False
+            assert test_logger.propagate is False
+
+    def test_shutdown_resets_all_state(self):
+        """Test that shutdown resets all module state including new variables."""
+        import importlib
+
+        import pentestgpt.core.langfuse as langfuse_module
+
+        importlib.reload(langfuse_module)
+
+        # Set up some state
+        langfuse_module._langfuse_client = MagicMock()
+        langfuse_module._current_span = MagicMock()
+        langfuse_module._user_id = "test-user"
+        langfuse_module._session_target = "10.10.11.234"
+        langfuse_module._pending_session = {"target": "test"}
+        langfuse_module._tool_executed = True
+
+        # Shutdown
+        langfuse_module.shutdown_langfuse()
+
+        # All state should be reset
+        assert langfuse_module._langfuse_client is None
+        assert langfuse_module._current_span is None
+        assert langfuse_module._user_id is None
+        assert langfuse_module._session_target is None
+        assert langfuse_module._pending_session is None
+        assert langfuse_module._tool_executed is False

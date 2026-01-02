@@ -103,9 +103,12 @@ Thumbs.db
 # Project Specific
 # ============================================================================
 
-# Runtime workspace (keep folder, ignore contents)
+# Runtime workspace - NEVER commit (contains VPN configs, exploits, sensitive data)
 workspace/*
 !workspace/.gitkeep
+
+# VPN configuration files (extra safety - never commit these anywhere)
+*.ovpn
 
 # Logs
 *.log
@@ -123,6 +126,14 @@ config/chatgpt_config.py
 outputs/
 test_history/
 archive/
+
+# ============================================================================
+# Local Docker Overrides (for regional mirrors, etc.)
+# ============================================================================
+
+Dockerfile.vpn
+docker-compose.override.yml
+vpn-mode.sh
 
 # ============================================================================
 # Documentation

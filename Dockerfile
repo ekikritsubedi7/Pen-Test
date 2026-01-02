@@ -34,6 +34,8 @@ RUN apt-get update && \
     net-tools \
     dnsutils \
     whois \
+    # VPN (for HackTheBox/TryHackMe connectivity)
+    openvpn \
     # Text processing
     jq \
     ripgrep \
