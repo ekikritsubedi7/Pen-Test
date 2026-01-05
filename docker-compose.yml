@@ -42,6 +42,7 @@ services:
       # API keys (set based on auth mode via .env.auth)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
 
 volumes:
   # Named volume for Claude Code config persistence
