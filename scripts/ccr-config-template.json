@@ -27,6 +27,15 @@
       "api_base_url": "http://host.docker.internal:1234/v1/chat/completions",
       "api_key": "not-needed",
       "models": ["qwen/qwen3-coder-30b", "openai/gpt-oss-20b"]
+    },
+    {
+      "name": "deepseek",
+      "api_base_url": "https://api.deepseek.com/chat/completions",
+      "api_key": "__DEEPSEEK_API_KEY__",
+      "models": ["deepseek-chat", "deepseek-reasoner"],
+      "transformer": {
+        "use": ["deepseek"]
+      }
     }
   ],
   "StatusLine": {

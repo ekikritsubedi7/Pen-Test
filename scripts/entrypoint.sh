@@ -18,6 +18,8 @@ NC='\033[0m'
 # Router configurations for different modes
 OPENROUTER_ROUTER='{"default":"openrouter,openai/gpt-5.1","background":"openrouter,openai/gpt-5.1","think":"openrouter,openai/gpt-5.1","longContext":"openrouter,openai/gpt-5.1","longContextThreshold":60000,"webSearch":"openrouter,google/gemini-3-pro-preview"}'
 LOCAL_ROUTER='{"default":"localLLM,openai/gpt-oss-20b","background":"localLLM,openai/gpt-oss-20b","think":"localLLM,qwen/qwen3-coder-30b","longContext":"localLLM,qwen/qwen3-coder-30b","longContextThreshold":60000,"webSearch":"localLLM,openai/gpt-oss-20b"}'
+# deepseek-v3.2 reasoner model is not compatible for for current ccr, will add deepseek-reasoner when it is available.
+DEEPSEEK_ROUTER='{"default":"deepseek,deepseek-chat","background":"deepseek,deepseek-chat","think":"deepseek,deepseek-chat","longContext":"deepseek,deepseek-chat","longContextThreshold":60000,"webSearch":"deepseek,deepseek-chat"}'
 
 setup_ccr() {
     local mode="$1"
@@ -38,17 +40,25 @@ setup_ccr() {
 
     # Substitute API key (for openrouter mode)
     if [ -n "$api_key" ]; then
-        sed -i "s/__OPENROUTER_API_KEY__/${api_key}/g" "$CCR_CONFIG_FILE"
+        if [ "$mode" = "openrouter" ]; then
+            sed -i "s/__OPENROUTER_API_KEY__/${api_key}/g" "$CCR_CONFIG_FILE"
+        else
+            sed -i "s/__DEEPSEEK_API_KEY__/${api_key}/g" "$CCR_CONFIG_FILE"
+        fi
     fi
 
     # Substitute Router config based on mode (use | as delimiter to avoid conflicts with /)
     if [ "$mode" = "openrouter" ]; then
         sed -i "s|\"__ROUTER_CONFIG__\"|${OPENROUTER_ROUTER}|g" "$CCR_CONFIG_FILE"
         local display_model="openai/gpt-5.1"
+    elif [ "$mode" = "deepseek" ]; then
+        sed -i "s|\"__ROUTER_CONFIG__\"|${DEEPSEEK_ROUTER}|g" "$CCR_CONFIG_FILE"
+        local display_model="deepseek-chat"
     else
         sed -i "s|\"__ROUTER_CONFIG__\"|${LOCAL_ROUTER}|g" "$CCR_CONFIG_FILE"
         local display_model="localLLM (qwen/qwen3-coder-30b, openai/gpt-oss-20b)"
     fi
+
 
     echo -e "${BLUE}Starting Claude Code Router...${NC}"
 
@@ -92,6 +102,14 @@ case "$AUTH_MODE" in
             exit 1
         fi
         setup_ccr "openrouter" "$OPENROUTER_API_KEY"
+        ;;
+    deepseek)
+        if [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo -e "${YELLOW}Error: DEEPSEEK_API_KEY not set${NC}"
+            echo "Please run 'make config' and select Deepseek option"
+            exit 1
+        fi
+        setup_ccr "deepseek" "$DEEPSEEK_API_KEY"
         ;;
     local)
         echo -e "${GREEN}Local LLM mode${NC}"
