@@ -63,8 +63,10 @@
 
 ## Features
 
-- **AI-Powered Challenge Solver** - Leverages LLM advanced reasoning to perform penetration testing and CTFs
-- **Live Walkthrough** - Tracks steps in real-time as the agent works through challenges
+- **Dual-Mode Operation** - Professional penetration testing mode AND CTF challenge solver
+- **Cyber Kill Chain Methodology** - Pentest mode follows reconnaissance → initial access → execution → persistence → privilege escalation
+- **AI-Powered Testing** - Leverages LLM advanced reasoning for intelligent vulnerability discovery
+- **Live Walkthrough** - Tracks steps in real-time as the agent works through assessments
 - **Multi-Category Support** - Web, Crypto, Reversing, Forensics, PWN, Privilege Escalation
 - **Real-Time Feedback** - Watch the AI work with live activity updates
 - **Extensible Architecture** - Clean, modular design ready for future enhancements
@@ -125,15 +127,28 @@ See [Benchmark Documentation](benchmark/README.md) for detailed usage.
 ## Usage
 
 ```bash
-# Interactive TUI mode (default)
-pentestgpt --target 10.10.11.234
+# Penetration Testing mode (default) - follows Cyber Kill Chain
+pentestgpt --target https://example.com
+
+# CTF mode - for CTF competitions and HTB machines
+pentestgpt --target 10.10.11.234 --mode ctf
 
 # Non-interactive mode
 pentestgpt --target 10.10.11.100 --non-interactive
 
-# With challenge context
-pentestgpt --target 10.10.11.50 --instruction "WordPress site, focus on plugin vulnerabilities"
+# With engagement context
+pentestgpt --target https://example.com --instruction "Focus on API endpoints and authentication"
+
+# CTF with challenge hints
+pentestgpt --target 10.10.11.50 --mode ctf --instruction "WordPress site, focus on plugin vulnerabilities"
 ```
+
+### Operating Modes
+
+| Mode | Flag | Use Case |
+|------|------|----------|
+| **Pentest** (default) | `--mode pentest` | Real-world security assessments, vulnerability reports |
+| **CTF** | `--mode ctf` | CTF competitions, HTB machines, flag hunting |
 
 **Keyboard Shortcuts:** `F1` Help | `Ctrl+P` Pause/Resume | `Ctrl+Q` Quit
 
