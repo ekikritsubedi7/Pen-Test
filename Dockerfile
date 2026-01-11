@@ -91,8 +91,8 @@ COPY --chown=pentester:pentester scripts/ccr-config-template.json /app/scripts/c
 # Allow pip to override system packages in Docker
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 USER root
-RUN poetry config virtualenvs.create false && \
-    poetry install --only main && \
+RUN /home/pentester/.local/bin/poetry config virtualenvs.create false && \
+    /home/pentester/.local/bin/poetry install --only main && \
     chmod +x /home/pentester/entrypoint.sh
 
 # Switch back to pentester user for runtime
