@@ -1,1 +1,1 @@
-"""Integration tests for PentestGPT."""
+"""Integration tests for Excalibur."""

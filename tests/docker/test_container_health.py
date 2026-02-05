@@ -41,7 +41,7 @@ class TestContainerHealth:
         # Wait for container to be ready
         time.sleep(5)
 
-        container_name = "pentestgpt"
+        container_name = "excalibur"
 
         # Check if container is running
         check_result = subprocess.run(
@@ -150,13 +150,13 @@ class TestContainerHealth:
         assert result.returncode == 0
         assert "sudo" in result.stdout, "sudo should be installed"
 
-    def test_pentestgpt_importable(self, running_container: str):
-        """Test that pentestgpt package is importable."""
+    def test_excalibur_importable(self, running_container: str):
+        """Test that excalibur package is importable."""
         result = self._exec_in_container(
-            running_container, "python3 -c 'import pentestgpt; print(\"ok\")'"
+            running_container, "python3 -c 'import excalibur; print(\"ok\")'"
         )
         assert result.returncode == 0, f"Import failed: {result.stderr}"
-        assert "ok" in result.stdout, "pentestgpt should be importable"
+        assert "ok" in result.stdout, "excalibur should be importable"
 
     def test_claude_code_available(self, running_container: str):
         """Test that Claude Code CLI is available."""

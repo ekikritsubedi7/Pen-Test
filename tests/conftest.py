@@ -1,13 +1,13 @@
-"""Shared pytest fixtures for PentestGPT tests."""
+"""Shared pytest fixtures for Excalibur tests."""
 
 import tempfile
 from pathlib import Path
 
 import pytest
 
-from pentestgpt.core.backend import AgentBackend, AgentMessage
-from pentestgpt.core.config import PentestGPTConfig
-from pentestgpt.core.events import EventBus
+from excalibur.core.backend import AgentBackend, AgentMessage
+from excalibur.core.config import ExcaliburConfig
+from excalibur.core.events import EventBus
 
 # =============================================================================
 # Pytest Markers
@@ -60,9 +60,9 @@ def temp_working_dir():
 
 
 @pytest.fixture
-def sample_config(temp_working_dir: Path) -> PentestGPTConfig:
+def sample_config(temp_working_dir: Path) -> ExcaliburConfig:
     """Create a sample configuration for testing."""
-    return PentestGPTConfig(
+    return ExcaliburConfig(
         target="test.example.com",
         working_directory=temp_working_dir,
     )
@@ -121,3 +121,35 @@ class MockBackend(AgentBackend):
 def mock_backend() -> MockBackend:
     """Create a mock backend for testing."""
     return MockBackend()
+
+
+# =============================================================================
+# Planner Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def attack_tree():
+    """Create a sample attack tree for testing."""
+    from excalibur.planner.models import AttackNode, AttackTree, EvidenceLevel, NodeType
+
+    root = AttackNode(
+        node_type=NodeType.OBSERVATION,
+        description="Initial recon of target",
+        host="10.10.10.1",
+        evidence_level=EvidenceLevel.VERIFIED,
+        promise_score=0.5,
+    )
+    tree = AttackTree(root_id=root.id)
+    tree.add_node(root)
+    return tree
+
+
+@pytest.fixture
+def state_store():
+    """Create an in-memory state store for testing."""
+    from excalibur.memory.state_store import StateStore
+
+    store = StateStore(db_path=":memory:")
+    yield store
+    store.close()

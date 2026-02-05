@@ -5,7 +5,7 @@ Unit tests for the EventBus singleton pattern and event emission.
 
 import pytest
 
-from pentestgpt.core.events import Event, EventBus, EventType
+from excalibur.core.events import Event, EventBus, EventType
 
 
 @pytest.mark.unit

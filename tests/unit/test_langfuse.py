@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pentestgpt.core.events import Event, EventBus, EventType
+from excalibur.core.events import Event, EventBus, EventType
 
 
 @pytest.mark.unit
@@ -21,7 +21,7 @@ class TestLangfuseIntegration:
         """Test that Langfuse is not initialized when disabled flag is True."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -36,7 +36,7 @@ class TestLangfuseIntegration:
         try:
             import importlib
 
-            import pentestgpt.core.langfuse as langfuse_module
+            import excalibur.core.langfuse as langfuse_module
 
             importlib.reload(langfuse_module)
 
@@ -58,7 +58,7 @@ class TestLangfuseIntegration:
             import importlib
             import sys
 
-            import pentestgpt.core.langfuse as langfuse_module
+            import excalibur.core.langfuse as langfuse_module
 
             importlib.reload(langfuse_module)
 
@@ -84,7 +84,7 @@ class TestLangfuseIntegration:
         """Test that a new user ID is created if none exists."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -99,7 +99,7 @@ class TestLangfuseIntegration:
             assert user_id.count("-") == 4
 
             # File should exist
-            user_id_file = Path(tmpdir) / ".pentestgpt" / "user_id"
+            user_id_file = Path(tmpdir) / ".excalibur" / "user_id"
             assert user_id_file.exists()
             assert user_id_file.read_text().strip() == user_id
 
@@ -107,15 +107,15 @@ class TestLangfuseIntegration:
         """Test that existing user ID is read from file."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create existing user ID file
-            pentestgpt_dir = Path(tmpdir) / ".pentestgpt"
-            pentestgpt_dir.mkdir(parents=True)
-            user_id_file = pentestgpt_dir / "user_id"
+            excalibur_dir = Path(tmpdir) / ".excalibur"
+            excalibur_dir.mkdir(parents=True)
+            user_id_file = excalibur_dir / "user_id"
             existing_id = "existing-test-uuid-1234"
             user_id_file.write_text(existing_id)
 
@@ -128,7 +128,7 @@ class TestLangfuseIntegration:
         """Test that shutdown_langfuse is safe to call when not initialized."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -139,7 +139,7 @@ class TestLangfuseIntegration:
         """Test that event handlers safely do nothing when client is None."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -157,7 +157,7 @@ class TestLangfuseIntegration:
         """Test that state handler stores pending session data on 'running' state (deferred creation)."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -187,7 +187,7 @@ class TestLangfuseIntegration:
         """Test that state handler uses the new target field when provided."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -217,7 +217,7 @@ class TestLangfuseIntegration:
         """Test that state handler falls back to details if target not provided."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -239,7 +239,7 @@ class TestLangfuseIntegration:
         """Test that state handler ends span and flushes on completion (v3 API)."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -264,7 +264,7 @@ class TestLangfuseIntegration:
         """Test that message handler creates a nested span (v3 API)."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -291,7 +291,7 @@ class TestLangfuseIntegration:
         """Test that tool handler creates session span on first tool (deferred creation)."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -317,7 +317,7 @@ class TestLangfuseIntegration:
         # Session span should now be created
         mock_client.start_span.assert_called_once()
         call_kwargs = mock_client.start_span.call_args.kwargs
-        assert call_kwargs["name"] == "pentestgpt:10.10.11.234"
+        assert call_kwargs["name"] == "excalibur:10.10.11.234"
         assert call_kwargs["input"]["target"] == "10.10.11.234"
         assert call_kwargs["input"]["task"] == "Solve CTF"
         assert call_kwargs["metadata"]["task"] == "Solve CTF"
@@ -335,7 +335,7 @@ class TestLangfuseIntegration:
         """Test that tool handler creates nested span when session span already exists."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -363,7 +363,7 @@ class TestLangfuseIntegration:
         """Test that session is discarded if completed without any tool execution."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -393,7 +393,7 @@ class TestLangfuseIntegration:
         """Test that flag handler creates a nested span (v3 API)."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -421,7 +421,7 @@ class TestLangfuseIntegration:
         """Test that handlers are properly subscribed to EventBus (v3 API)."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -456,7 +456,7 @@ class TestLangfuseIntegration:
         import importlib
         import logging
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 
@@ -482,7 +482,7 @@ class TestLangfuseIntegration:
         """Test that shutdown resets all module state including new variables."""
         import importlib
 
-        import pentestgpt.core.langfuse as langfuse_module
+        import excalibur.core.langfuse as langfuse_module
 
         importlib.reload(langfuse_module)
 

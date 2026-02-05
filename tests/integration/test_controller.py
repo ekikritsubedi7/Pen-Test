@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from pentestgpt.core.backend import AgentMessage, MessageType
-from pentestgpt.core.config import PentestGPTConfig
-from pentestgpt.core.controller import AgentController, AgentState
-from pentestgpt.core.session import SessionStore
+from excalibur.core.backend import AgentMessage, MessageType
+from excalibur.core.config import ExcaliburConfig
+from excalibur.core.controller import AgentController, AgentState
+from excalibur.core.session import SessionStore
 from tests.conftest import MockBackend
 
 
@@ -19,9 +19,9 @@ class TestAgentController:
     """Tests for AgentController."""
 
     @pytest.fixture
-    def config(self, temp_working_dir: Path) -> PentestGPTConfig:
+    def config(self, temp_working_dir: Path) -> ExcaliburConfig:
         """Create test config."""
-        return PentestGPTConfig(
+        return ExcaliburConfig(
             target="test.example.com",
             working_directory=temp_working_dir,
         )
@@ -29,7 +29,7 @@ class TestAgentController:
     @pytest.fixture
     def controller(
         self,
-        config: PentestGPTConfig,
+        config: ExcaliburConfig,
         mock_backend: MockBackend,
         temp_sessions_dir: Path,
     ) -> AgentController:

@@ -1,1 +1,1 @@
-"""Unit tests for PentestGPT."""
+"""Unit tests for Excalibur."""

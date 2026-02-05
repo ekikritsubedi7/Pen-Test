@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# PentestGPT Container Entrypoint
-# Sets up authentication based on PENTESTGPT_AUTH_MODE environment variable
+# Excalibur Container Entrypoint
+# Sets up authentication based on EXCALIBUR_AUTH_MODE environment variable
 
 set -e
 
-AUTH_MODE="${PENTESTGPT_AUTH_MODE:-manual}"
+AUTH_MODE="${EXCALIBUR_AUTH_MODE:-manual}"
 CCR_CONFIG_DIR="/home/pentester/.claude-code-router"
 CCR_CONFIG_FILE="${CCR_CONFIG_DIR}/config.json"
 BASHRC_FILE="/home/pentester/.bashrc"
@@ -82,7 +82,7 @@ setup_ccr() {
 }
 
 echo ""
-echo -e "${BLUE}=== PentestGPT Authentication ===${NC}"
+echo -e "${BLUE}=== Excalibur Authentication ===${NC}"
 
 case "$AUTH_MODE" in
     openrouter)

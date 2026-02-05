@@ -1,13 +1,13 @@
 """Tests for flag detection patterns.
 
-Unit tests for the flag detection regex patterns used in PentestAgent.
+Unit tests for the flag detection regex patterns used in ExcaliburAgent.
 """
 
 import re
 
 import pytest
 
-# Flag patterns from pentestgpt/core/agent.py
+# Flag patterns from excalibur/core/agent.py
 FLAG_PATTERNS = [
     r"flag\{[^\}]+\}",  # flag{...}
     r"FLAG\{[^\}]+\}",  # FLAG{...}

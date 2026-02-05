@@ -5,7 +5,7 @@ Unit tests for AgentBackend abstract interface and AgentMessage dataclass.
 
 import pytest
 
-from pentestgpt.core.backend import AgentBackend, AgentMessage, MessageType
+from excalibur.core.backend import AgentBackend, AgentMessage, MessageType
 
 
 @pytest.mark.unit

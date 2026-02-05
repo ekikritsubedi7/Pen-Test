@@ -1,6 +1,6 @@
 """Tests for configuration management.
 
-Unit tests for PentestGPTConfig and load_config function.
+Unit tests for ExcaliburConfig and load_config function.
 """
 
 import os
@@ -10,16 +10,16 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from pentestgpt.core.config import PentestGPTConfig, load_config
+from excalibur.core.config import ExcaliburConfig, load_config
 
 
 @pytest.mark.unit
-class TestPentestGPTConfig:
-    """Tests for PentestGPTConfig."""
+class TestExcaliburConfig:
+    """Tests for ExcaliburConfig."""
 
     def test_create_config_with_required_fields(self, temp_working_dir: Path):
         """Test creating config with only required fields."""
-        config = PentestGPTConfig(
+        config = ExcaliburConfig(
             target="10.10.11.234",
             working_directory=temp_working_dir,
         )
@@ -28,7 +28,7 @@ class TestPentestGPTConfig:
 
     def test_default_values(self, temp_working_dir: Path):
         """Test that default values are set correctly."""
-        config = PentestGPTConfig(
+        config = ExcaliburConfig(
             target="example.com",
             working_directory=temp_working_dir,
         )
@@ -44,13 +44,13 @@ class TestPentestGPTConfig:
     def test_missing_required_field(self, temp_working_dir: Path):
         """Test that missing target raises validation error."""
         with pytest.raises(ValidationError):
-            PentestGPTConfig(
+            ExcaliburConfig(
                 working_directory=temp_working_dir,
             )  # type: ignore[call-arg]
 
     def test_custom_instruction(self, temp_working_dir: Path):
         """Test setting custom instruction."""
-        config = PentestGPTConfig(
+        config = ExcaliburConfig(
             target="ctf.example.com",
             working_directory=temp_working_dir,
             custom_instruction="Focus on web vulnerabilities",
@@ -60,14 +60,14 @@ class TestPentestGPTConfig:
     def test_interface_mode_validation(self, temp_working_dir: Path):
         """Test interface mode must be valid."""
         # Valid modes
-        config_tui = PentestGPTConfig(
+        config_tui = ExcaliburConfig(
             target="test.com",
             working_directory=temp_working_dir,
             interface_mode="tui",
         )
         assert config_tui.interface_mode == "tui"
 
-        config_cli = PentestGPTConfig(
+        config_cli = ExcaliburConfig(
             target="test.com",
             working_directory=temp_working_dir,
             interface_mode="cli",
@@ -76,7 +76,7 @@ class TestPentestGPTConfig:
 
         # Invalid mode
         with pytest.raises(ValidationError):
-            PentestGPTConfig(
+            ExcaliburConfig(
                 target="test.com",
                 working_directory=temp_working_dir,
                 interface_mode="invalid",  # type: ignore[arg-type]
@@ -84,14 +84,14 @@ class TestPentestGPTConfig:
 
     def test_permission_mode_validation(self, temp_working_dir: Path):
         """Test permission mode must be valid."""
-        config_ask = PentestGPTConfig(
+        config_ask = ExcaliburConfig(
             target="test.com",
             working_directory=temp_working_dir,
             permission_mode="ask",
         )
         assert config_ask.permission_mode == "ask"
 
-        config_bypass = PentestGPTConfig(
+        config_bypass = ExcaliburConfig(
             target="test.com",
             working_directory=temp_working_dir,
             permission_mode="bypassPermissions",
@@ -104,7 +104,7 @@ class TestPentestGPTConfig:
             new_dir = Path(tmpdir) / "new_workspace"
             assert not new_dir.exists()
 
-            config = PentestGPTConfig(
+            config = ExcaliburConfig(
                 target="test.com",
                 working_directory=new_dir,
             )
@@ -114,7 +114,7 @@ class TestPentestGPTConfig:
 
     def test_system_prompt_path(self, temp_working_dir: Path):
         """Test system_prompt_path property."""
-        config = PentestGPTConfig(
+        config = ExcaliburConfig(
             target="test.com",
             working_directory=temp_working_dir,
         )
@@ -151,7 +151,7 @@ class TestLoadConfig:
 
     def test_from_env_classmethod(self, temp_working_dir: Path):
         """Test from_env classmethod."""
-        config = PentestGPTConfig.from_env(
+        config = ExcaliburConfig.from_env(
             target="env.example.com",
             working_directory=temp_working_dir,
         )

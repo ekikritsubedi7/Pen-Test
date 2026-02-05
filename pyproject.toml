@@ -1,8 +1,8 @@
 [project]
-name = "pentestgpt"
-version = "1.0.0"
-description = "AI-powered autonomous penetration testing agent with beautiful TUI - Published at USENIX Security 2024"
-authors = [{ name = "Gelei Deng", email = "GELEI.DENG@ntu.edu.sg" }]
+name = "excalibur"
+version = "2.0.0"
+description = "AI-powered autonomous penetration testing agent with TDA-EGATS planner"
+authors = [{ name = "Anonymous" }]
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12,<4.0"
@@ -10,11 +10,10 @@ keywords = [
     "penetration-testing",
     "security",
     "ai",
-    "claude",
     "pentest",
     "cybersecurity",
     "ctf",
-    "hacking",
+    "attack-tree",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -37,19 +36,14 @@ dependencies = [
 ]
 
 [project.scripts]
-pentestgpt = "pentestgpt.interface.main:main"
-pentestgpt-benchmark = "pentestgpt.benchmark.cli:main"
-
-[project.urls]
-Homepage = "https://github.com/GreyDGL/PentestGPT"
-Repository = "https://github.com/GreyDGL/PentestGPT"
+excalibur = "excalibur.interface.main:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["pentestgpt"]
+packages = ["excalibur"]
 
 # ============================================================================
 # uv Configuration
@@ -79,8 +73,6 @@ extend-exclude = [
     "__pycache__",
     "build",
     "dist",
-    "legacy",
-    "PentestGPTClaude",
 ]
 
 [tool.ruff.lint]

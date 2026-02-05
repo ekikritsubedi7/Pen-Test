@@ -9,7 +9,7 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-echo -e "${BLUE}PentestGPT Workspace Permission Fix${NC}\n"
+echo -e "${BLUE}Excalibur Workspace Permission Fix${NC}\n"
 
 # Check if workspace exists
 if [ ! -d "./workspace" ]; then
@@ -36,4 +36,4 @@ echo -e "${BLUE}Rebuilding Docker image with updated code...${NC}"
 docker-compose build
 
 echo -e "\n${GREEN}✓ All done! You can now run:${NC}"
-echo -e "  ${NC}docker-compose run --rm pentestgpt --target example.com${NC}\n"
+echo -e "  ${NC}docker-compose run --rm excalibur --target example.com${NC}\n"

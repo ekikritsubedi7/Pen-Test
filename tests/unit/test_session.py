@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from pentestgpt.core.session import SessionInfo, SessionStatus, SessionStore
+from excalibur.core.session import SessionInfo, SessionStatus, SessionStore
 
 
 @pytest.mark.unit

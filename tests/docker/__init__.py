@@ -1,1 +1,1 @@
-"""Docker tests for PentestGPT."""
+"""Docker tests for Excalibur."""

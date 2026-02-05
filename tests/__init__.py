@@ -1,1 +1,1 @@
-"""Test package for PentestGPT."""
+"""Test package for Excalibur."""

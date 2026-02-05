@@ -1,7 +1,7 @@
 services:
-  pentestgpt:
-    container_name: pentestgpt
-    image: pentestgpt:latest
+  excalibur:
+    container_name: excalibur
+    image: excalibur:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -38,7 +38,7 @@ services:
       # Python settings
       - PYTHONUNBUFFERED=1
       # Auth mode: "openrouter", "anthropic", or "manual"
-      - PENTESTGPT_AUTH_MODE=${PENTESTGPT_AUTH_MODE:-manual}
+      - EXCALIBUR_AUTH_MODE=${EXCALIBUR_AUTH_MODE:-manual}
       # API keys (set based on auth mode via .env.auth)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
