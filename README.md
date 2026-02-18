@@ -53,6 +53,8 @@
 
 ## What's New in v1.0 (Agentic Upgrade)
 
+- **Multi-Stage Pipeline** - 3-stage architecture (Recon, Exploit/Vuln ID, Report/Walkthrough) with context passed between stages
+- **Two Pipeline Modes** - `--mode ctf` (DFS exploitation, default) and `--mode pentest` (BFS vulnerability identification with formal report)
 - **Autonomous Agent** - Agentic pipeline for intelligent, autonomous penetration testing
 - **Session Persistence** - Save and resume penetration testing sessions
 - **Docker-First** - Isolated, reproducible environment with security tools pre-installed
@@ -125,15 +127,25 @@ See [Benchmark Documentation](benchmark/README.md) for detailed usage.
 ## Usage
 
 ```bash
-# Interactive TUI mode (default)
+# CTF mode (default) - DFS exploitation to capture flags
 pentestgpt --target 10.10.11.234
+
+# Pentest mode - BFS vulnerability identification with formal report
+pentestgpt --target 10.10.11.234 --mode pentest
 
 # Non-interactive mode
 pentestgpt --target 10.10.11.100 --non-interactive
 
 # With challenge context
 pentestgpt --target 10.10.11.50 --instruction "WordPress site, focus on plugin vulnerabilities"
+
+# Raw output mode (debugging)
+pentestgpt --target 10.10.11.234 --raw
 ```
+
+**Pipeline Modes:**
+- `ctf` (default): Recon → DFS Exploitation → Walkthrough
+- `pentest`: Asset Identification → BFS Vulnerability ID → Formal Report
 
 **Keyboard Shortcuts:** `F1` Help | `Ctrl+P` Pause/Resume | `Ctrl+Q` Quit
 
