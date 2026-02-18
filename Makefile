@@ -224,25 +224,25 @@ ci-full:
 	@echo "Running full CI simulation with Docker..."
 	@echo "=========================================="
 	@echo ""
-	@echo "[1/7] Lint check (ruff check)..."
+	@echo "[1/8] Lint check (ruff check)..."
 	uv run ruff check pentestgpt/ tests/
 	@echo ""
-	@echo "[2/7] Format check (ruff format --check)..."
+	@echo "[2/8] Format check (ruff format --check)..."
 	uv run ruff format --check pentestgpt/ tests/
 	@echo ""
-	@echo "[3/7] Type check (mypy)..."
+	@echo "[3/8] Type check (mypy)..."
 	uv run mypy pentestgpt/
 	@echo ""
-	@echo "[4/7] Running tests..."
+	@echo "[4/8] Running tests..."
 	uv run pytest tests/ -v --ignore=tests/docker/
 	@echo ""
-	@echo "[5/7] Validating docker-compose config..."
+	@echo "[5/8] Validating docker-compose config..."
 	docker compose config
 	@echo ""
-	@echo "[6/7] Building Docker image..."
+	@echo "[6/8] Building Docker image..."
 	docker compose build
 	@echo ""
-	@echo "[7/7] Running Docker tests..."
+	@echo "[7/8] Running Docker tests..."
 	uv run pytest tests/docker/ -v -m docker
 	@echo ""
 	@echo "[8/8] Building package..."
