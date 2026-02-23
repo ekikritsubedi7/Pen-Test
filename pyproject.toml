@@ -1,7 +1,7 @@
 [project]
 name = "pentestgpt"
 version = "1.0.0"
-description = "AI-powered autonomous penetration testing agent with beautiful TUI - Published at USENIX Security 2024"
+description = "AI-powered autonomous penetration testing agent - Published at USENIX Security 2024"
 authors = [{ name = "Gelei Deng", email = "GELEI.DENG@ntu.edu.sg" }]
 readme = "README.md"
 license = { text = "MIT" }
@@ -26,19 +26,14 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "textual>=0.47.0",
-    "rich>=13.7.0",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
-    "claude-agent-sdk>=0.1.0",
     "python-dotenv>=1.0.0",
-    "anthropic>=0.75.0",
     "langfuse>=2.0.0",
 ]
 
 [project.scripts]
 pentestgpt = "pentestgpt.interface.main:main"
-pentestgpt-benchmark = "pentestgpt.benchmark.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/GreyDGL/PentestGPT"
@@ -79,8 +74,6 @@ extend-exclude = [
     "__pycache__",
     "build",
     "dist",
-    "legacy",
-    "PentestGPTClaude",
 ]
 
 [tool.ruff.lint]
@@ -114,13 +107,6 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
-
-[[tool.mypy.overrides]]
-module = [
-    "claude_agent_sdk.*",
-    "textual.*",
-]
-ignore_missing_imports = true
 
 # ============================================================================
 # Pytest Configuration

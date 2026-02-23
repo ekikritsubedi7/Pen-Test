@@ -89,7 +89,7 @@
 
 ```bash
 # Clone and build
-git clone --recurse-submodules https://github.com/GreyDGL/PentestGPT.git
+git clone https://github.com/GreyDGL/PentestGPT.git
 cd PentestGPT
 make install
 
@@ -99,17 +99,6 @@ make config
 # Connect to container
 make connect
 ```
-
-> **Note**: The `--recurse-submodules` flag downloads the benchmark suite. If you already cloned without it, run: `git submodule update --init --recursive`
-
-### Try a Benchmark
-
-```bash
-cd benchmark/standalone-xbow-benchmark-runner
-python3 run_benchmarks.py --range 1-1 --pattern-flag
-```
-
-See [Benchmark Documentation](benchmark/README.md) for detailed usage.
 
 ### Commands Reference
 
@@ -133,21 +122,13 @@ pentestgpt --target 10.10.11.234
 # Pentest mode - BFS vulnerability identification with formal report
 pentestgpt --target 10.10.11.234 --mode pentest
 
-# Non-interactive mode
-pentestgpt --target 10.10.11.100 --non-interactive
-
 # With challenge context
 pentestgpt --target 10.10.11.50 --instruction "WordPress site, focus on plugin vulnerabilities"
-
-# Raw output mode (debugging)
-pentestgpt --target 10.10.11.234 --raw
 ```
 
 **Pipeline Modes:**
 - `ctf` (default): Recon → DFS Exploitation → Walkthrough
 - `pentest`: Asset Identification → BFS Vulnerability ID → Formal Report
-
-**Keyboard Shortcuts:** `F1` Help | `Ctrl+P` Pause/Resume | `Ctrl+Q` Quit
 
 ---
 
@@ -220,19 +201,6 @@ export LANGFUSE_ENABLED=false
 
 ## Benchmarks
 
-PentestGPT includes 104 XBOW validation benchmarks for comprehensive testing and evaluation.
-
-```bash
-cd benchmark/standalone-xbow-benchmark-runner
-
-python3 run_benchmarks.py --range 1-10 --pattern-flag   # Run benchmarks 1-10
-python3 run_benchmarks.py --all --pattern-flag          # Run all 104 benchmarks
-python3 run_benchmarks.py --retry-failed                # Retry failed benchmarks
-python3 run_benchmarks.py --dry-run --range 1-5         # Preview without executing
-```
-
-### Performance Highlights
-
 PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW validation suite:
 
 - **Cost**: Average $1.11, Median $0.42 per successful benchmark
@@ -241,18 +209,6 @@ PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW va
   - Level 1: 91.1%
   - Level 2: 74.5%
   - Level 3: 62.5%
-
-For detailed benchmark results, analysis, and automated testing instructions, see the **[Benchmark Documentation](benchmark/README.md)**.
-
----
-
-## Legacy Version
-
-The previous multi-LLM version (v0.15) supporting OpenAI, Gemini, Deepseek, and Ollama is archived in [`legacy/`](legacy/):
-
-```bash
-cd legacy && pip install -e . && pentestgpt --reasoning gpt-4o
-```
 
 ---
 

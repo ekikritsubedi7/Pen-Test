@@ -142,9 +142,6 @@ test-backend:
 test-config:
 	uv run pytest tests/unit/test_config.py -v
 
-test-benchmark:
-	uv run pytest tests/unit/test_benchmark_registry.py tests/integration/test_benchmark_cli.py -v
-
 # ============================================================================
 # Code Quality
 # ============================================================================
@@ -275,17 +272,13 @@ clean:
 # Local Development
 # ============================================================================
 
-# Run the TUI locally (for development)
+# Run locally
 run:
 	uv run pentestgpt --target example.com
 
 # Run in debug mode
 run-debug:
 	uv run pentestgpt --target example.com --debug
-
-# Run in raw mode (no TUI, streaming output for debugging)
-run-raw:
-	uv run pentestgpt --target example.com --raw
 
 # Watch for changes and run tests
 watch:

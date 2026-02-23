@@ -45,21 +45,18 @@ RUN apt-get update && \
     && apt-get autoclean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js v20 (required for Claude Code CLI)
+# Install Node.js v20 (required for Claude Code Router)
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Remove EXTERNALLY-MANAGED marker to allow pip/poetry in Docker
-# Also remove system Python packages that conflict with Poetry dependencies
+# Remove EXTERNALLY-MANAGED marker to allow pip installs in Docker
+# Also remove system Python packages that conflict with dependencies
 RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED && \
     apt-get remove -y python3-cryptography && \
     apt-get autoremove -y
 
-# Install Claude Code CLI globally
-RUN npm install -g @anthropic-ai/claude-code
-
-# Install Claude Code Router globally (for OpenRouter support)
+# Install Claude Code Router globally (for OpenRouter/local LLM support)
 RUN npm install -g @musistudio/claude-code-router
 
 # Create non-root user
@@ -75,9 +72,11 @@ RUN mkdir -p /workspace /app /home/pentester/.claude /home/pentester/.claude-cod
 USER pentester
 WORKDIR /app
 
-# Install Poetry for Python dependency management
-RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    echo 'export PATH="/home/pentester/.local/bin:$PATH"' >> /home/pentester/.bashrc
+# Install Claude Code CLI (native installer — no npm needed)
+RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# Install uv for Python dependency management
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ENV PATH="/home/pentester/.local/bin:$PATH"
 
@@ -88,11 +87,9 @@ COPY --chown=pentester:pentester scripts/entrypoint.sh /home/pentester/entrypoin
 COPY --chown=pentester:pentester scripts/ccr-config-template.json /app/scripts/ccr-config-template.json
 
 # Install Python dependencies as root to system Python
-# Allow pip to override system packages in Docker
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 USER root
-RUN poetry config virtualenvs.create false && \
-    poetry install --only main && \
+RUN /home/pentester/.local/bin/uv pip install --system /app && \
     chmod +x /home/pentester/entrypoint.sh
 
 # Switch back to pentester user for runtime
