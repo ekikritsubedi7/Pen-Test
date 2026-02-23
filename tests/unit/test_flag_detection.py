@@ -7,7 +7,7 @@ import re
 
 import pytest
 
-# Flag patterns from pentestgpt/core/agent.py
+# Flag patterns from pentestgpt/core/controller.py
 FLAG_PATTERNS = [
     r"flag\{[^\}]+\}",  # flag{...}
     r"FLAG\{[^\}]+\}",  # FLAG{...}
