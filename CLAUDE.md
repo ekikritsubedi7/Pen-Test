@@ -97,18 +97,32 @@ pip install -e .
 
 ## Benchmark System
 
-Use the standalone benchmark runner at `benchmark/standalone-xbow-benchmark-runner/`:
+The benchmark module (`pentestgpt/benchmark/`) manages benchmark containers:
 
 ```bash
-cd benchmark/standalone-xbow-benchmark-runner
+# List available benchmarks
+pentestgpt-benchmark list                              # List all benchmarks
+pentestgpt-benchmark list --show-tags                  # Show vulnerability tags
+pentestgpt-benchmark list --tags sqli --levels 1      # Filter benchmarks
 
-python3 run_benchmarks.py --range 1-10 --pattern-flag   # Run benchmarks 1-10
-python3 run_benchmarks.py --all --pattern-flag          # Run all 104 benchmarks
-python3 run_benchmarks.py --retry-failed                # Retry failed benchmarks
-python3 run_benchmarks.py --dry-run --range 1-5         # Preview without executing
+# Start a benchmark (exposes port to localhost)
+pentestgpt-benchmark start XBEN-001-24
+
+# Check running benchmarks
+pentestgpt-benchmark status
+
+# Stop a benchmark
+pentestgpt-benchmark stop XBEN-001-24
+
+# Then run PentestGPT manually against the target
+pentestgpt --target http://0.0.0.0:<port>
 ```
 
-See `benchmark/standalone-xbow-benchmark-runner/README.md` for full documentation.
+### Benchmark Module Structure
+- **config.py** - Simple configuration (paths, ports)
+- **registry.py** - `BenchmarkRegistry`: Discovers benchmarks from `benchmark.json` files
+- **docker.py** - Start/stop containers via docker compose
+- **cli.py** - CLI interface for list/start/stop/status commands
 
 ## Repository Structure
 
@@ -121,8 +135,7 @@ See `benchmark/standalone-xbow-benchmark-runner/README.md` for full documentatio
 │   ├── benchmark/        # Benchmark runner module
 │   └── tools/            # Tool framework
 ├── benchmark/            # Benchmark suites
-│   ├── xbow-validation-benchmarks/  # 104 XBOW benchmarks
-│   └── standalone-xbow-benchmark-runner/  # Benchmark runner
+│   └── xbow-validation-benchmarks/  # 104 XBOW benchmarks
 ├── tests/                # Test suite
 ├── workspace/            # Runtime workspace (Docker mount)
 ├── legacy/               # Archived v0.15 (multi-LLM)

@@ -10,8 +10,6 @@ This directory contains benchmark suites for evaluating PentestGPT's automated p
 
 - [Overview](#overview)
 - [Supported Benchmarks](#supported-benchmarks)
-  - [USENIX Security 2024 Paper Benchmark](#usenix-security-2024-paper-benchmark)
-  - [XBOW Validation Benchmarks](#xbow-validation-benchmarks)
 - [Running Benchmarks](#running-benchmarks)
 - [Automated Testing](#automated-testing)
 - [Performance Results](#performance-results)
@@ -28,39 +26,7 @@ The PentestGPT benchmark system provides a framework for evaluating automated pe
 
 ## Supported Benchmarks
 
-### USENIX Security 2024 Paper Benchmark
-
-The original benchmark from the USENIX Security 2024 paper evaluates PentestGPT on real-world penetration testing targets from HackTheBox and VulnHub platforms.
-
-#### Statistics
-
-- **Total Targets**: 13 (from HackTheBox and VulnHub)
-- **Total Sub-tasks**: 182
-- **Vulnerability Coverage**: OWASP Top 10
-- **Evaluation**: Compared against GPT-3.5, GPT-4, Bard, and human expert testers (OSCP certified)
-
-#### Resources
-
-- **Artifact Branch**: [github.com/GreyDGL/PentestGPT/tree/artifact](https://github.com/GreyDGL/PentestGPT/tree/artifact)
-- **Benchmark Spreadsheet**: [Google Sheets - Complete Benchmark Data](https://docs.google.com/spreadsheets/d/1FpyMf91DDsnynkIvQXph_hmzPyCvXQW_aC5SKgF1lGk/edit?usp=sharing)
-- **Research Paper**: [USENIX Security 2024](https://www.usenix.org/conference/usenixsecurity24/presentation/deng)
-
-#### Key Results
-
-- PentestGPT outperformed standalone LLMs with a **228.6% task-completion increase** compared to GPT-3.5
-- Won the **Distinguished Artifact Award** at USENIX Security 2024
-
-#### Sample Targets
-
-Includes targets from:
-- **VulnHub**: DeathNote, Hackable-II, Kioptrix Level 1
-- **HackTheBox**: Various CTF challenges (Templated, Precious, Phonebook, etc.)
-
-For detailed target definitions and evaluation methodology, see the [artifact branch](https://github.com/GreyDGL/PentestGPT/tree/artifact) and [benchmark spreadsheet](https://docs.google.com/spreadsheets/d/1FpyMf91DDsnynkIvQXph_hmzPyCvXQW_aC5SKgF1lGk/edit?usp=sharing).
-
----
-
-### XBOW Validation Benchmarks
+### XBOW Validation Benchmarks 
 
 The XBOW validation benchmark suite is the first benchmark suite supported by PentestGPT. It provides a comprehensive set of 104 vulnerability challenges designed to test automated penetration testing capabilities.
 
@@ -97,28 +63,93 @@ The XBOW benchmarks cover the following vulnerability types:
 
 ## Running Benchmarks
 
-Use the standalone benchmark runner for all benchmark testing:
+### Basic Commands
 
 ```bash
-cd standalone-xbow-benchmark-runner
+# List all available benchmarks
+pentestgpt-benchmark list
 
-# Preview what will be executed
+# Filter by difficulty level (1, 2, or 3)
+pentestgpt-benchmark list --levels 1
+
+# Filter by vulnerability tag
+pentestgpt-benchmark list --tags sqli
+
+# Show all tags for each benchmark
+pentestgpt-benchmark list --show-tags
+
+# Start a specific benchmark
+pentestgpt-benchmark start XBEN-001-24
+
+# Check running benchmarks
+pentestgpt-benchmark status
+
+# Stop a benchmark
+pentestgpt-benchmark stop XBEN-001-24
+```
+
+### Manual Testing Workflow
+
+1. Start a benchmark container:
+```bash
+pentestgpt-benchmark start XBEN-037-24
+# Container will be accessible at http://0.0.0.0:<port>
+```
+
+2. Connect to PentestGPT container:
+```bash
+make connect
+```
+
+3. Run PentestGPT against the benchmark:
+```bash
+pentestgpt --target http://host.docker.internal:<port>
+```
+
+4. Clean up when done:
+```bash
+pentestgpt-benchmark stop XBEN-037-24
+```
+
+---
+
+## Automated Testing
+
+For comprehensive automated testing, use the standalone benchmark runner.
+
+### Setup
+
+```bash
+# Navigate to the runner directory
+cd benchmark/standalone-xbow-benchmark-runner
+
+# Ensure Docker is running
+docker ps
+```
+
+### Usage
+
+```bash
+# Preview what will be executed (recommended first step)
 python3 run_benchmarks.py --dry-run --range 1-5 --pattern-flag
 
-# Run benchmarks
-python3 run_benchmarks.py --range 1-10 --pattern-flag    # Range of benchmarks
-python3 run_benchmarks.py --all --pattern-flag           # All 104 benchmarks
-python3 run_benchmarks.py --retry-failed                 # Retry failed only
+# Run a single benchmark with strict flag validation
+python3 run_benchmarks.py --range 1-1 --pattern-flag
 
-# Model selection
-python3 run_benchmarks.py --range 1-10 --model opus      # Use Claude Opus
-python3 run_benchmarks.py --range 1-10 --model haiku     # Use Claude Haiku
+# Run multiple benchmarks
+python3 run_benchmarks.py --range 1-10 --pattern-flag
 
-# Extended timeout (default: 15 minutes)
-python3 run_benchmarks.py --range 1-10 --timeout 1800
+# Run all 104 benchmarks
+python3 run_benchmarks.py --all --pattern-flag
+
+# Run with extended timeout (default is 15 minutes)
+python3 run_benchmarks.py --range 1-10 --pattern-flag --timeout 1800
 
 # Resume interrupted run
 python3 run_benchmarks.py --resume --pattern-flag
+
+# See all options
+python3 run_benchmarks.py --help
 ```
 
 ### Features
@@ -128,8 +159,9 @@ python3 run_benchmarks.py --resume --pattern-flag
 - **Flag verification**: Automatic detection and validation using regex patterns
 - **Resumption support**: Resume interrupted runs without re-running completed benchmarks
 - **Cost tracking**: API cost and execution time analysis
+- **Summary reports**: Detailed results with success rates, costs, and timing statistics
 
-See [standalone-xbow-benchmark-runner/README.md](standalone-xbow-benchmark-runner/README.md) for detailed usage.
+See [standalone-xbow-benchmark-runner/README.md](standalone-xbow-benchmark-runner/README.md) for detailed usage instructions.
 
 ---
 
