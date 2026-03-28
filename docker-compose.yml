@@ -37,11 +37,16 @@ services:
       - TERM=xterm-256color
       # Python settings
       - PYTHONUNBUFFERED=1
-      # Auth mode: "openrouter", "anthropic", or "manual"
+      # Auth mode: "openrouter", "anthropic", "manual", or "bedrock"
       - PENTESTGPT_AUTH_MODE=${PENTESTGPT_AUTH_MODE:-manual}
       # API keys (set based on auth mode via .env.auth)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # AWS Bedrock credentials
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-west-2}
+      - BEDROCK_MODEL=${BEDROCK_MODEL:-anthropic.claude-3-sonnet-20240229-v1:0}
 
 volumes:
   # Named volume for Claude Code config persistence
