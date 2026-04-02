@@ -42,7 +42,7 @@ make clean-docker                 # Remove everything including config
 - Command: `pentestgpt --target <IP/URL> [--instruction "hint"] [--non-interactive] [--raw] [--debug]`
 
 ### Core Layer (`pentestgpt/core/`)
-- **agent.py** - `PentestAgent`: Wraps the LLM agent, handles flag detection, logs to `/workspace/pentestgpt-debug.log`
+- **agent.py** - `PentestAgent`: Wraps the LLM agent, handles flag detection, logs to `workspace/pentestgpt-debug.log`
 - **backend.py** - `AgentBackend` interface + `ClaudeCodeBackend` implementation (framework-agnostic design)
 - **controller.py** - `AgentController`: 5-state lifecycle (IDLE->RUNNING->PAUSED->COMPLETED->ERROR), pause/resume at message boundaries
 - **events.py** - `EventBus`: Singleton pub/sub for TUI-agent decoupling (STATE_CHANGED, MESSAGE, TOOL, FLAG_FOUND events)
@@ -76,7 +76,7 @@ uv run pytest tests/test_controller.py::test_name # Single test
 ## Docker Notes
 
 - Non-root user: `pentester` with sudo
-- Workdir: `/workspace` (mounted from `./workspace`)
+- Workdir: `workspace/` (mapped to `/workspace` inside Docker)
 - LLM config persisted in `claude-config` volume
 - Pre-installed: nmap, netcat, curl, wget, git, ripgrep, tmux
 
