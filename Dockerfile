@@ -39,11 +39,21 @@ RUN apt-get update && \
     # Text processing
     jq \
     ripgrep \
+    # AWS CLI v2 dependencies
+    unzip \
+    less \
+    groff \
     # Terminal
     tmux \
     && apt-get autoremove -y \
     && apt-get autoclean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install AWS CLI v2
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip && \
+    unzip /tmp/awscliv2.zip -d /tmp && \
+    /tmp/aws/install && \
+    rm -rf /tmp/awscliv2.zip /tmp/aws
 
 # Install Node.js v20 (required for Claude Code CLI)
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -94,6 +104,11 @@ USER root
 RUN poetry config virtualenvs.create false && \
     poetry install --only main && \
     chmod +x /home/pentester/entrypoint.sh
+
+# Install AWS pentesting tools (run as root so they land in system Python)
+RUN pip install --break-system-packages \
+    prowler \
+    trufflehog
 
 # Switch back to pentester user for runtime
 USER pentester
