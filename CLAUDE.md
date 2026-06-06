@@ -8,12 +8,12 @@ PentestGPT is an AI-powered autonomous penetration testing agent. It uses an age
 
 **Published at USENIX Security 2024**: [Paper](https://www.usenix.org/conference/usenixsecurity24/presentation/deng)
 
-**Stack:** Python 3.12+, uv, Docker (Ubuntu 24.04), Agent SDK
+**Stack:** Python 3.12+, uv, Agent SDK
 
 ## Common Commands
 
 ```bash
-# Development
+# Setup
 uv sync                           # Install dependencies
 uv run pentestgpt --target X      # Run locally
 
@@ -27,36 +27,28 @@ make lint                         # Run ruff linter
 make format                       # Format code with ruff
 make typecheck                    # Run mypy type checking
 make check                        # All checks (lint + typecheck)
-
-# Docker Workflow
-make install                      # Build Docker image
-make connect                      # Connect to container (main usage)
-make stop                         # Stop container
-make clean-docker                 # Remove everything including config
 ```
 
 ## Architecture
 
 ### Entry Point
 - `pentestgpt/interface/main.py` - CLI entry, argument parsing, raw streaming output
-- Command: `pentestgpt --target <IP/URL> [--mode ctf|pentest] [--instruction "hint"] [--debug]`
+- Command: `pentestgpt --target <IP/URL> [--max-iterations N] [--instruction "hint"] [--debug]`
 
 ### Core Layer (`pentestgpt/core/`)
-- **pipeline.py** - `PipelineOrchestrator`: Runs 3 stages sequentially, each with a fresh backend + controller. Data classes: `PipelineMode`, `StageDefinition`, `StageResult`, `PipelineResult`
-- **pipelines.py** - Factory: `CTF_STAGES`, `PENTEST_STAGES`, `get_stages(mode)` — wires stage definitions to prompt builders
+- **pipeline.py** - `PipelineOrchestrator`: Runs an iteration loop, each iteration with a fresh backend + controller. Data classes: `IterationResult`, `LoopResult`. The agent writes a context file (`pentestgpt_context.md`) as it works; the orchestrator reads it after each iteration and feeds it into the next. Loop terminates on flag capture, error, or max iterations.
 - **backend.py** - `AgentBackend` interface + `ClaudeCodeBackend` implementation (framework-agnostic design)
-- **controller.py** - `AgentController`: 5-state lifecycle (IDLE->RUNNING->PAUSED->COMPLETED->ERROR), pause/resume at message boundaries. Used per-stage by the pipeline orchestrator
+- **controller.py** - `AgentController`: 5-state lifecycle (IDLE->RUNNING->PAUSED->COMPLETED->ERROR), pause/resume at message boundaries. Used per-iteration by the pipeline orchestrator
 - **events.py** - `EventBus`: Singleton pub/sub for agent-output decoupling (STATE_CHANGED, MESSAGE, TOOL, FLAG_FOUND events)
 - **session.py** - `SessionStore`: File-based persistence in `~/.pentestgpt/sessions/`, supports session resumption
-- **config.py** - Pydantic settings with `.env` file support; includes `mode: Literal["ctf", "pentest"]`
+- **config.py** - Pydantic settings with `.env` file support; includes `max_iterations` (default 10) and `context_file` (default `pentestgpt_context.md`)
 
 ### System Prompts (`pentestgpt/prompts/`)
-- **stages.py** - Stage-specific prompt builders for both pipelines. Shared fragments (`_IDENTITY`, `_TOOLS`, `_FLAG_PATTERNS`, `_PERSISTENCE`, `_FALLBACK_STRATEGIES`). 6 CTF + 6 Pentest builder functions
+- **system_prompt.py** - Unified prompt builders: `build_system_prompt`, `build_first_task_prompt`, `build_continuation_task_prompt`. Shared fragments (`_IDENTITY`, `_TOOLS`, `_FLAG_PATTERNS`, `_PERSISTENCE`, `_FALLBACK_STRATEGIES`, `_CTF_CATEGORIES`, `_METHODOLOGY`, `_CONTEXT_PERSISTENCE`)
 
 ## Key Patterns
 
-- **Multi-Stage Pipeline**: `PipelineOrchestrator` runs 3 stages sequentially. Each stage gets a fresh `ClaudeCodeBackend` + `AgentController` (system prompt is set at connect time, so a new backend is needed per stage). Prior stage output is passed as context to the next stage's task prompt.
-- **Two Modes**: CTF (Recon -> DFS Exploit -> Walkthrough) and Pentest (Asset ID -> BFS Vuln ID -> Report). Selected via `--mode ctf|pentest` or `config.mode`.
+- **Iteration Loop**: `PipelineOrchestrator` runs iterations in a loop. Each iteration gets a fresh `ClaudeCodeBackend` + `AgentController` (system prompt is set at connect time, so a new backend is needed per iteration). The agent maintains a context file; the orchestrator reads it after each iteration and injects it into the next iteration's task prompt. Falls back to truncated prior output if the context file is missing.
 - **Event-Driven**: Raw mode subscribes to EventBus; agent emits events for state changes, messages, flags
 - **Singletons**: `EventBus.get()` for global access
 - **Abstract Backend**: `AgentBackend` interface allows swapping LLM backends
@@ -72,27 +64,40 @@ uv run pytest tests/test_controller.py -v         # Single file
 uv run pytest tests/test_controller.py::test_name # Single test
 ```
 
-## Docker Notes
-
-- Non-root user: `pentester` with sudo
-- Workdir: `/workspace` (mounted from `./workspace`)
-- LLM config persisted in `claude-config` volume
-- Pre-installed: nmap, netcat, curl, wget, git, ripgrep, tmux
-
 ## Repository Structure
 
 ```
 .
-├── pentestgpt/           # Main package
+├── pentestgpt/           # Autonomous agent (Claude-only, claude CLI backend)
 │   ├── core/             # Pipeline, controller, events, session, backend
 │   ├── interface/        # CLI entry point (raw streaming)
-│   └── prompts/          # System prompts (stages.py)
-├── tests/                # Test suite
-├── workspace/            # Runtime workspace (Docker mount)
-├── Dockerfile            # Ubuntu 24.04 container
-├── docker-compose.yml    # Container orchestration
+│   └── prompts/          # System prompts (system_prompt.py)
+├── pentestgpt_legacy/    # Modernized legacy: interactive 3-session + PTT, multi-LLM
+│   ├── llm/              # Native per-provider LLM layer (registry, factory, client, providers)
+│   ├── utils/            # Orchestrator (pentest_gpt.py) + REPL helpers
+│   └── prompts/          # Classic PTT/session prompts
+├── tests/                # Test suite (tests/legacy/ covers pentestgpt_legacy)
 └── Makefile              # Development commands
 ```
+
+### Modernized Legacy (`pentestgpt_legacy/`)
+
+The classic USENIX-2024 human-in-the-loop tool, rebuilt on a native multi-provider LLM
+layer. CLI: `pentestgpt-legacy` (`--list-models`, `--smoke-test`, `--reasoning-model`,
+`--parsing-model`, `--base-url`).
+
+- **llm/registry.py** — single source of truth for supported models (`ModelSpec`/`PROVIDERS`),
+  web-verified IDs. `--list-models` and the README table render from it.
+- **llm/factory.py** — `get_client(model_name)` -> `LLMClient`; resolves provider, builds it.
+- **llm/client.py** — `LLMClient` bridges async providers to the core's synchronous
+  `send_new_message`/`send_message` (drop-in for the old `LLMAPI`); holds per-conversation history.
+- **llm/providers/** — `OpenAICompatibleProvider` (OpenAI + DeepSeek/Ollama/xAI/Qwen/Moonshot via
+  base_url; Responses-API fallback for `*-pro`/`*-codex`), `AnthropicProvider`, `GeminiProvider`.
+- **llm/config.py** — pydantic-settings credentials (per-provider keys + base-url overrides).
+- **smoke_test.py** — `--smoke-test` makes a real round-trip per configured model (acceptance gate).
+
+Note: `make typecheck` is scoped to `pentestgpt/`; the new package is covered by ruff
+(`make lint`) and `tests/legacy/`. Run `uv run mypy pentestgpt_legacy/llm/` for its typed core.
 
 ## Modification Requirements
 
