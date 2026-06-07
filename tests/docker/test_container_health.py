@@ -95,11 +95,11 @@ class TestContainerHealth:
         assert result.returncode == 0
         assert "Python 3.1" in result.stdout, "Python 3.12+ should be installed"
 
-    def test_poetry_installed(self, running_container: str):
-        """Test that Poetry package manager is installed."""
-        result = self._exec_in_container(running_container, "poetry --version")
+    def test_uv_installed(self, running_container: str):
+        """Test that the uv package manager is installed."""
+        result = self._exec_in_container(running_container, "uv --version")
         assert result.returncode == 0
-        assert "Poetry" in result.stdout, "Poetry should be installed"
+        assert "uv" in result.stdout, "uv should be installed"
 
     def test_nmap_installed(self, running_container: str):
         """Test that nmap is installed."""
