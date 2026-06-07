@@ -53,11 +53,13 @@
 
 ## What's New in v1.0 (Agentic Upgrade)
 
+- **Iteration Loop** - The agent runs continuously, maintains a context file with progress, and restarts with prior context when hitting limits. Loop terminates on flag capture or max iterations.
 - **Autonomous Agent** - Agentic pipeline for intelligent, autonomous penetration testing
 - **Session Persistence** - Save and resume penetration testing sessions
-- **Docker-First** - Isolated, reproducible environment with security tools pre-installed
 
-> **In Progress**: Multi-model support for OpenAI, Gemini, and other LLM providers
+> **Multi-model support** is available today in the interactive **modernized legacy** mode
+> (`pentestgpt-legacy`) — OpenAI, Anthropic, Google Gemini, DeepSeek, xAI, Qwen, Moonshot, and
+> local Ollama. See [Interactive Multi-LLM Mode](#interactive-multi-llm-mode-modernized-legacy).
 
 ---
 
@@ -75,113 +77,101 @@
 
 ### Prerequisites
 
-- **Docker** (required) - [Install Docker](https://docs.docker.com/get-docker/)
-- **LLM Provider** (choose one):
-  - Anthropic API Key from [console.anthropic.com](https://console.anthropic.com/)
-  - Claude OAuth Login (requires Claude subscription)
-  - OpenRouter for alternative models at [openrouter.ai](https://openrouter.ai/keys)
-  - [Tutorial: Using Local Models with Claude Code](https://docs.google.com/document/d/1ixK7x-wlr5t5TYZJdfm75UME5KnPCpS46boLkUXKg1w/edit?usp=sharing)
-
+- **Python 3.12+**
+- **[uv](https://docs.astral.sh/uv/)** - Python package manager
+- **Claude Code CLI** (`claude`) - installed and authenticated. See [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code)
 
 ### Installation
 
 ```bash
-# Clone and build
-git clone --recurse-submodules https://github.com/GreyDGL/PentestGPT.git
+git clone https://github.com/GreyDGL/PentestGPT.git
 cd PentestGPT
-make install
-
-# Configure authentication (first time only)
-make config
-
-# Connect to container
-make connect
+make install    # runs uv sync
 ```
-
-> **Note**: The `--recurse-submodules` flag downloads the benchmark suite. If you already cloned without it, run: `git submodule update --init --recursive`
-
-### Try a Benchmark
-
-```bash
-cd benchmark/standalone-xbow-benchmark-runner
-python3 run_benchmarks.py --range 1-1 --pattern-flag
-```
-
-See [Benchmark Documentation](benchmark/README.md) for detailed usage.
 
 ### Commands Reference
 
 | Command | Description |
 |---------|-------------|
-| `make install` | Build the Docker image |
-| `make config` | Configure API key (first-time setup) |
-| `make connect` | Connect to container (main entry point) |
-| `make stop` | Stop container (config persists) |
-| `make clean-docker` | Remove everything including config |
-
+| `make install` | Install dependencies |
+| `make test` | Run all tests |
+| `make check` | Run lint + typecheck |
+| `make build` | Build distributable package |
 
 ---
 
 ## Usage
 
 ```bash
-# Interactive TUI mode (default)
+# Run against a target
 pentestgpt --target 10.10.11.234
-
-# Non-interactive mode
-pentestgpt --target 10.10.11.100 --non-interactive
 
 # With challenge context
 pentestgpt --target 10.10.11.50 --instruction "WordPress site, focus on plugin vulnerabilities"
+
+# Limit iterations
+pentestgpt --target 10.10.11.234 --max-iterations 5
 ```
 
-**Keyboard Shortcuts:** `F1` Help | `Ctrl+P` Pause/Resume | `Ctrl+Q` Quit
+The agent runs in an **iteration loop**: it works autonomously, maintains a context file with progress, and restarts with prior context when hitting limits. The loop terminates on flag capture or max iterations (default: 10).
 
 ---
 
-## Using Local LLMs
+## Interactive Multi-LLM Mode (modernized legacy)
 
-PentestGPT supports routing requests to local LLM servers (LM Studio, Ollama, text-generation-webui, etc.) running on your host machine.
+The classic, human-in-the-loop PentestGPT from the USENIX 2024 paper is preserved and
+modernized as `pentestgpt-legacy`. It runs three cooperating LLM sessions —
+**reasoning / generation / parsing** — that maintain a **Pentesting Task Tree (PTT)** while you
+drive the session interactively (`next`, `more`, `todo`, `discuss`). Unlike the autonomous agent
+(Claude-only), this mode talks **natively** to many providers via their official SDKs.
 
-### Prerequisites
+### Configure providers
 
-- Local LLM server with an OpenAI-compatible API endpoint
-  - **LM Studio**: Enable server mode (default port 1234)
-  - **Ollama**: Run `ollama serve` (default port 11434)
-
-### Setup
+Set an API key for any provider you want to use (in your environment or `.env` — see
+`.env.example`). Only the providers you configure are enabled.
 
 ```bash
-# Configure PentestGPT for local LLM
-make config
-# Select option 4: Local LLM
-
-# Start your local LLM server on the host machine
-# Then connect to the container
-make connect
+OPENAI_API_KEY=...        ANTHROPIC_API_KEY=...     GEMINI_API_KEY=...   # or GOOGLE_API_KEY
+DEEPSEEK_API_KEY=...      GROK_API_KEY=...          QWEN_API_KEY=...     KIMI_API_KEY=...
 ```
 
-### Customizing Models
+### Run
 
-Edit `scripts/ccr-config-template.json` to customize:
+```bash
+# Auto-pick the best available models for each session
+pentestgpt-legacy
 
-- **`localLLM.api_base_url`**: Your LLM server URL (default: `host.docker.internal:1234`)
-- **`localLLM.models`**: Available model names on your server
-- **Router section**: Which models handle which operations
+# Choose models per session
+pentestgpt-legacy --reasoning-model claude-opus-4-8 --parsing-model gemini-3.5-flash
 
-| Route | Purpose | Default Model |
-|-------|---------|---------------|
-| `default` | General tasks | openai/gpt-oss-20b |
-| `background` | Background operations | openai/gpt-oss-20b |
-| `think` | Reasoning-heavy tasks | qwen/qwen3-coder-30b |
-| `longContext` | Large context handling | qwen/qwen3-coder-30b |
-| `webSearch` | Web search operations | openai/gpt-oss-20b |
+# Local model via Ollama (OpenAI-compatible)
+pentestgpt-legacy --reasoning-model ollama:qwen3 --base-url http://localhost:11434/v1
 
-### Troubleshooting
+# List every supported model (shows which providers are configured)
+pentestgpt-legacy --list-models
 
-- **Connection refused**: Ensure your LLM server is running and listening on the configured port
-- **Docker networking**: Use `host.docker.internal` (not `localhost`) to access host services from Docker
-- **Check CCR logs**: Inside the container, run `cat /tmp/ccr.log`
+# Live round-trip every configured model and print a pass/fail matrix
+pentestgpt-legacy --smoke-test
+```
+
+### Supported models (web-verified June 2026)
+
+`pentestgpt-legacy --list-models` always renders the live registry. Re-run `--smoke-test`
+after model IDs change. Current snapshot:
+
+| Provider | Current models | Legacy (kept) | Env key |
+|----------|----------------|---------------|---------|
+| **OpenAI** | `gpt-5.5`, `gpt-5.5-pro`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.2`, `gpt-5.3-codex` | `gpt-4o`, `gpt-4o-mini`, `o3`, `o4-mini` | `OPENAI_API_KEY` |
+| **Anthropic** | `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001` | — | `ANTHROPIC_API_KEY` |
+| **Google Gemini** | `gemini-3.1-pro`, `gemini-3.5-flash`, `gemini-3-pro`, `gemini-3.1-flash-lite` | `gemini-2.5-pro`, `gemini-2.5-flash` | `GEMINI_API_KEY` / `GOOGLE_API_KEY` |
+| **DeepSeek** | `deepseek-v4-flash`, `deepseek-v4-pro` | `deepseek-chat`, `deepseek-reasoner` | `DEEPSEEK_API_KEY` |
+| **xAI Grok** | `grok-4.3` | — | `GROK_API_KEY` / `XAI_API_KEY` |
+| **Alibaba Qwen** | `qwen3.7-max`, `qwen3.5-flash` | `qwen3-max` | `QWEN_API_KEY` / `DASHSCOPE_API_KEY` |
+| **Moonshot Kimi** | `kimi-k2.6` | — | `KIMI_API_KEY` (`.cn` default; set `MOONSHOT_BASE_URL` for `.ai`) |
+| **Local (Ollama)** | `ollama:<model>` (e.g. `ollama:qwen3`) | — | none (`OLLAMA_BASE_URL`) |
+
+> The registry lives in `pentestgpt_legacy/llm/registry.py` (the single source of truth).
+> Adding a model is one `ModelSpec` entry; OpenAI-compatible providers reuse one connector.
 
 ---
 
@@ -208,19 +198,6 @@ export LANGFUSE_ENABLED=false
 
 ## Benchmarks
 
-PentestGPT includes 104 XBOW validation benchmarks for comprehensive testing and evaluation.
-
-```bash
-cd benchmark/standalone-xbow-benchmark-runner
-
-python3 run_benchmarks.py --range 1-10 --pattern-flag   # Run benchmarks 1-10
-python3 run_benchmarks.py --all --pattern-flag          # Run all 104 benchmarks
-python3 run_benchmarks.py --retry-failed                # Retry failed benchmarks
-python3 run_benchmarks.py --dry-run --range 1-5         # Preview without executing
-```
-
-### Performance Highlights
-
 PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW validation suite:
 
 - **Cost**: Average $1.11, Median $0.42 per successful benchmark
@@ -229,18 +206,6 @@ PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW va
   - Level 1: 91.1%
   - Level 2: 74.5%
   - Level 3: 62.5%
-
-For detailed benchmark results, analysis, and automated testing instructions, see the **[Benchmark Documentation](benchmark/README.md)**.
-
----
-
-## Legacy Version
-
-The previous multi-LLM version (v0.15) supporting OpenAI, Gemini, Deepseek, and Ollama is archived in [`legacy/`](legacy/):
-
-```bash
-cd legacy && pip install -e . && pentestgpt --reasoning gpt-4o
-```
 
 ---
 

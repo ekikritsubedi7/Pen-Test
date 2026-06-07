@@ -33,7 +33,7 @@ else
 fi
 
 echo -e "${BLUE}Rebuilding Docker image with updated code...${NC}"
-docker-compose build
+docker compose build
 
 echo -e "\n${GREEN}✓ All done! You can now run:${NC}"
-echo -e "  ${NC}docker-compose run --rm pentestgpt --target example.com${NC}\n"
+echo -e "  ${NC}docker compose run --rm pentestgpt --target example.com${NC}\n"

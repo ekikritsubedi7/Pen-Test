@@ -1,7 +1,7 @@
 [project]
 name = "pentestgpt"
 version = "1.0.0"
-description = "AI-powered autonomous penetration testing agent with beautiful TUI - Published at USENIX Security 2024"
+description = "AI-powered autonomous penetration testing agent - Published at USENIX Security 2024"
 authors = [{ name = "Gelei Deng", email = "GELEI.DENG@ntu.edu.sg" }]
 readme = "README.md"
 license = { text = "MIT" }
@@ -26,19 +26,23 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "textual>=0.47.0",
-    "rich>=13.7.0",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
-    "claude-agent-sdk>=0.1.0",
     "python-dotenv>=1.0.0",
-    "anthropic>=0.75.0",
     "langfuse>=2.0.0",
+    # Modernized legacy PentestGPT: interactive UI + native multi-provider LLM SDKs
+    "prompt-toolkit>=3.0.0",
+    "rich>=13.0.0",
+    "loguru>=0.7.0",
+    "openai>=1.55.0",
+    "anthropic>=0.49.0",
+    "google-genai>=1.0.0",
 ]
 
 [project.scripts]
 pentestgpt = "pentestgpt.interface.main:main"
-pentestgpt-benchmark = "pentestgpt.benchmark.cli:main"
+pentestgpt-legacy = "pentestgpt_legacy.main:main"
+pentestgpt-legacy-connection = "pentestgpt_legacy.test_connection:test_connection"
 
 [project.urls]
 Homepage = "https://github.com/GreyDGL/PentestGPT"
@@ -49,7 +53,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["pentestgpt"]
+packages = ["pentestgpt", "pentestgpt_legacy"]
 
 # ============================================================================
 # uv Configuration
@@ -79,8 +83,6 @@ extend-exclude = [
     "__pycache__",
     "build",
     "dist",
-    "legacy",
-    "PentestGPTClaude",
 ]
 
 [tool.ruff.lint]
@@ -115,11 +117,9 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 
+# Third-party SDKs without complete type stubs (used by pentestgpt_legacy).
 [[tool.mypy.overrides]]
-module = [
-    "claude_agent_sdk.*",
-    "textual.*",
-]
+module = ["google.genai.*", "google.*"]
 ignore_missing_imports = true
 
 # ============================================================================
@@ -138,6 +138,5 @@ asyncio_mode = "auto"
 markers = [
     "unit: Unit tests (fast, no external dependencies)",
     "integration: Integration tests (may use mocks)",
-    "docker: Docker tests (requires Docker daemon)",
     "slow: Slow tests (skip with -m 'not slow')",
 ]

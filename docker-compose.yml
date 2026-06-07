@@ -33,7 +33,7 @@ services:
           cpus: '2'        # Guarantee 2 CPU cores
           memory: 4G       # Guarantee 4GB RAM
     environment:
-      # Terminal settings for proper TUI rendering
+      # Terminal settings
       - TERM=xterm-256color
       # Python settings
       - PYTHONUNBUFFERED=1

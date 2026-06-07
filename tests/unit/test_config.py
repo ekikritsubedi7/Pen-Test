@@ -37,7 +37,6 @@ class TestPentestGPTConfig:
         assert config.llm_api_base is None
         assert config.max_iterations == 300
         assert config.custom_instruction is None
-        assert config.interface_mode == "tui"
         assert config.verbose is True
         assert config.permission_mode == "bypassPermissions"
 
@@ -56,31 +55,6 @@ class TestPentestGPTConfig:
             custom_instruction="Focus on web vulnerabilities",
         )
         assert config.custom_instruction == "Focus on web vulnerabilities"
-
-    def test_interface_mode_validation(self, temp_working_dir: Path):
-        """Test interface mode must be valid."""
-        # Valid modes
-        config_tui = PentestGPTConfig(
-            target="test.com",
-            working_directory=temp_working_dir,
-            interface_mode="tui",
-        )
-        assert config_tui.interface_mode == "tui"
-
-        config_cli = PentestGPTConfig(
-            target="test.com",
-            working_directory=temp_working_dir,
-            interface_mode="cli",
-        )
-        assert config_cli.interface_mode == "cli"
-
-        # Invalid mode
-        with pytest.raises(ValidationError):
-            PentestGPTConfig(
-                target="test.com",
-                working_directory=temp_working_dir,
-                interface_mode="invalid",  # type: ignore[arg-type]
-            )
 
     def test_permission_mode_validation(self, temp_working_dir: Path):
         """Test permission mode must be valid."""
@@ -111,16 +85,6 @@ class TestPentestGPTConfig:
 
             assert new_dir.exists()
             assert config.working_directory == new_dir
-
-    def test_system_prompt_path(self, temp_working_dir: Path):
-        """Test system_prompt_path property."""
-        config = PentestGPTConfig(
-            target="test.com",
-            working_directory=temp_working_dir,
-        )
-        prompt_path = config.system_prompt_path
-        assert prompt_path.name == "pentesting.py"
-        assert "prompts" in str(prompt_path)
 
 
 @pytest.mark.unit
