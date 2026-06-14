@@ -3,6 +3,7 @@
 
 .PHONY: help install test test-cov test-verbose lint format typecheck clean build
 .PHONY: ci ci-quick
+.PHONY: docker-build docker-login docker-auth-status docker-shell docker-run docker-down docker-nuke
 
 # Default target
 help:
@@ -21,6 +22,14 @@ help:
 	@echo "  make ci           Run full CI simulation (lint, format, typecheck, test, build)"
 	@echo "  make ci-quick     Run quick CI (skip build step)"
 	@echo "  make clean        Clean build artifacts"
+	@echo ""
+	@echo "Docker (the tool, with persistent Claude + Codex login):"
+	@echo "  make docker-build        Build the tool image"
+	@echo "  make docker-login        ONE-TIME: log in to Claude + Codex (persists to volumes)"
+	@echo "  make docker-auth-status  Check both CLIs are logged in (ROUNDTRIP=1 for live check)"
+	@echo "  make docker-run TARGET=… BACKEND=… MODEL=… MODE=…   Run the pipeline against a target"
+	@echo "  make docker-shell        Interactive shell in the tool container"
+	@echo "  make docker-nuke         Remove login volumes (forces re-login)"
 
 # ============================================================================
 # Setup
@@ -178,3 +187,52 @@ run-debug:
 # Watch for changes and run tests
 watch:
 	uv run ptw tests/ -- -v
+
+# ============================================================================
+# Docker (the tool, with persistent Claude + Codex login)
+# ============================================================================
+
+DOCKER_IMAGE  ?= pentestgpt:latest
+CLAUDE_VOL    ?= pentestgpt-claude
+CODEX_VOL     ?= pentestgpt-codex
+# Mount the persisted login volumes + a host workspace into a run.
+DOCKER_AUTH_MOUNTS = -v $(CLAUDE_VOL):/home/pentester/.claude -v $(CODEX_VOL):/home/pentester/.codex
+DOCKER_RUN_MOUNTS  = $(DOCKER_AUTH_MOUNTS) -v $(PWD)/workspace:/workspace
+# Run knobs (override on the CLI): TARGET, BACKEND, MODEL, MODE, INSTRUCTION
+BACKEND ?= claude
+MODEL   ?=
+MODE    ?= ctf
+
+# Build the tool image
+docker-build:
+	docker build -t $(DOCKER_IMAGE) .
+
+# ONE-TIME: log in to Claude + Codex; persists into named volumes (no re-login after)
+docker-login:
+	./scripts/docker-login.sh
+
+# Report whether both CLIs are logged in (add ROUNDTRIP=1 for a live 1-token check)
+docker-auth-status:
+	docker run --rm $(DOCKER_AUTH_MOUNTS) --entrypoint bash $(DOCKER_IMAGE) \
+		-lc '/home/pentester/docker-auth-status.sh $(if $(ROUNDTRIP),--roundtrip,)'
+
+# Interactive shell in the tool container (login volumes attached)
+docker-shell:
+	docker run -it --rm $(DOCKER_RUN_MOUNTS) -e PENTESTGPT_AUTH_MODE=manual $(DOCKER_IMAGE)
+
+# Run the pipeline against a target:
+#   make docker-run TARGET=http://127.0.0.1:8000 BACKEND=codex MODEL=gpt-5.5 MODE=ctf
+docker-run:
+	@test -n "$(TARGET)" || (echo "Set TARGET=... (e.g. http://host:port)"; exit 1)
+	docker run --rm $(DOCKER_RUN_MOUNTS) -e PENTESTGPT_AUTH_MODE=manual \
+		$(DOCKER_IMAGE) pentestgpt --target $(TARGET) --backend $(BACKEND) \
+		$(if $(MODEL),--model $(MODEL),) --mode $(MODE) --no-telemetry \
+		$(if $(INSTRUCTION),--instruction "$(INSTRUCTION)",)
+
+# Stop/remove the compose container but KEEP the login volumes (stay logged in)
+docker-down:
+	docker compose down
+
+# Remove the persisted login volumes (forces a fresh `make docker-login`)
+docker-nuke:
+	-docker volume rm $(CLAUDE_VOL) $(CODEX_VOL)

@@ -25,6 +25,8 @@ RUN apt-get update && \
     python3-dev \
     # Essential pentesting tools
     nmap \
+    gobuster \
+    dirb \
     netcat-openbsd \
     curl \
     wget \
@@ -59,14 +61,18 @@ RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED && \
 # Install Claude Code Router globally (for OpenRouter/local LLM support)
 RUN npm install -g @musistudio/claude-code-router
 
+# Install the OpenAI Codex CLI globally (for `pentestgpt --backend codex`)
+RUN npm install -g @openai/codex
+
 # Create non-root user
 RUN useradd -m -s /bin/bash pentester && \
     usermod -aG sudo pentester && \
     echo "pentester ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Set up working directories (including ccr config)
-RUN mkdir -p /workspace /app /home/pentester/.claude /home/pentester/.claude-code-router && \
-    chown -R pentester:pentester /workspace /app /home/pentester/.claude /home/pentester/.claude-code-router
+# Set up working directories (claude + codex auth dirs are owned by pentester so the
+# named volumes mounted there at runtime inherit the right ownership on first use)
+RUN mkdir -p /workspace /app /home/pentester/.claude /home/pentester/.codex /home/pentester/.claude-code-router && \
+    chown -R pentester:pentester /workspace /app /home/pentester/.claude /home/pentester/.codex /home/pentester/.claude-code-router
 
 # Switch to pentester user
 USER pentester
@@ -80,17 +86,28 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ENV PATH="/home/pentester/.local/bin:$PATH"
 
-# Copy project files
+# Copy project files (the "solution": the CTF pipeline + the backend-agnostic
+# substrate + the next-gen framework — all declared in pyproject's wheel packages).
+# NOTE: the benchmark harness is deliberately NOT in the image; it stays outside
+# and drives this container against targets.
 COPY --chown=pentester:pentester pyproject.toml README.md /app/
 COPY --chown=pentester:pentester pentestgpt/ /app/pentestgpt/
+COPY --chown=pentester:pentester unified_agent/ /app/unified_agent/
+COPY --chown=pentester:pentester pentestgpt_agent/ /app/pentestgpt_agent/
+COPY --chown=pentester:pentester pentestgpt_legacy/ /app/pentestgpt_legacy/
 COPY --chown=pentester:pentester scripts/entrypoint.sh /home/pentester/entrypoint.sh
+COPY --chown=pentester:pentester scripts/docker-auth-status.sh /home/pentester/docker-auth-status.sh
 COPY --chown=pentester:pentester scripts/ccr-config-template.json /app/scripts/ccr-config-template.json
 
 # Install Python dependencies as root to system Python
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 USER root
 RUN /home/pentester/.local/bin/uv pip install --system /app && \
-    chmod +x /home/pentester/entrypoint.sh
+    chmod +x /home/pentester/entrypoint.sh /home/pentester/docker-auth-status.sh
+
+# socat forwards the Codex OAuth localhost:1455 callback into the container during `make docker-login`
+# (kept as a late layer so it doesn't invalidate the apt/pip cache above).
+RUN apt-get update && apt-get install -y --no-install-recommends socat && rm -rf /var/lib/apt/lists/*
 
 # Switch back to pentester user for runtime
 USER pentester

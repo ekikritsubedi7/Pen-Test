@@ -118,6 +118,27 @@ pentestgpt --list-sessions
 
 The agent works through a **multi-stage pipeline**, feeding each stage's findings into the next — recon → exploit → walkthrough for CTF, asset discovery → vulnerability identification → report for pentest.
 
+### Run in Docker (install once, log in once)
+
+A self-contained image bundles the tool + the Claude Code **and** Codex CLIs. You log in **once** and
+the sessions persist in named volumes — no re-login on later runs.
+
+```bash
+make docker-build        # build the tool image
+make docker-login        # ONE-TIME, idempotent: checks logins, logs in only what's missing
+make docker-auth-status  # check both are logged in (ROUNDTRIP=1 for a live 1-token check)
+
+# Run the pipeline against a target (any backend / model / mode):
+make docker-run TARGET=http://127.0.0.1:8000 BACKEND=codex MODEL=gpt-5.5 MODE=ctf
+make docker-run TARGET=10.10.11.234         BACKEND=claude MODEL=opus    MODE=pentest
+```
+
+`make docker-login` logs in **Claude** (`setup-token` → token stored in the volume) and **Codex** (its
+own in-container `codex login`, OAuth callback forwarded via socat — *not* seeded, since ChatGPT refresh
+tokens are single-use). It is idempotent: re-running skips whatever is still valid. Logins persist across
+container recreation; `make docker-down` keeps them, `make docker-nuke` removes the login volumes (to
+force a fresh login / rotate a token). Design + details: [`docs/docker-dev-plan.md`](docs/docker-dev-plan.md).
+
 ---
 
 ## Interactive Multi-LLM Mode (modernized legacy)
@@ -201,7 +222,8 @@ export LANGFUSE_ENABLED=false
 
 ## Benchmarks
 
-PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW validation suite:
+PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW validation suite
+(single-model, Dec-2025 baseline):
 
 - **Cost**: Average $1.11, Median $0.42 per successful benchmark
 - **Time**: Average 6.1 minutes, Median 3.3 minutes per successful benchmark
@@ -209,6 +231,15 @@ PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW va
   - Level 1: 91.1%
   - Level 2: 74.5%
   - Level 3: 62.5%
+
+### Multi-model benchmarking
+
+The CTF pipeline is now backend-pluggable (`--backend {claude,codex}`), enabling head-to-head
+comparison of Claude (`opus`/`sonnet`) and OpenAI Codex (`gpt-5.5`/`gpt-5.4-mini`) on the same
+challenges. A reproducible harness lives in [`benchmark/pilot/`](benchmark/pilot/README.md); the
+latest run is in [`benchmark/pilot/REPORT.md`](benchmark/pilot/REPORT.md). The harness and its
+remaining work (full medium/hard sweep, dockerized isolated execution) are tracked in the
+[design doc](docs/redesign/pentestgpt-redesign-decisions.html) roadmap.
 
 ---
 

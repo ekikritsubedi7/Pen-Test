@@ -8,7 +8,7 @@ PentestGPT is an AI-powered autonomous penetration testing agent. It solves CTF 
 
 **Published at USENIX Security 2024**: [Paper](https://www.usenix.org/conference/usenixsecurity24/presentation/deng)
 
-**Stack:** Python 3.12+, uv, Claude Code CLI (the agent backend spawns `claude -p` as a subprocess).
+**Stack:** Python 3.12+, uv, Claude Code CLI (the default agent backend spawns `claude -p` as a subprocess). The CTF pipeline is backend-pluggable: `--backend codex` instead drives OpenAI Codex (via the `unified_agent` Codex backend), so the same pipeline can run on Claude (`opus`/`sonnet`) or Codex (`gpt-5.5`/`gpt-5.4-mini`).
 
 ## Common Commands
 
@@ -27,22 +27,42 @@ make lint                                 # Run ruff linter
 make format                               # Format code with ruff
 make typecheck                            # Run mypy (scoped to pentestgpt/)
 make check                                # lint + typecheck
+
+# Docker (the tool, with persistent Claude + Codex login)
+make docker-build                         # Build the tool image (tool only; NO benchmark)
+make docker-login                         # ONE-TIME: persist Claude + Codex logins into named volumes
+make docker-run TARGET=… BACKEND=… MODEL=… MODE=…   # Run the pipeline against a target
 ```
+
+Docker design notes: the image bundles the CTF pipeline + both CLIs (`claude`, `codex`) + `openai_codex`.
+Logins persist in named volumes `pentestgpt-claude` / `pentestgpt-codex`. The two CLIs need **different**
+auth handling because their token models differ:
+- **Claude** — `claude setup-token` yields a long-lived token; `make docker-login` stores it at
+  `~/.claude/oauth_token` in the volume and the entrypoint exports it as `CLAUDE_CODE_OAUTH_TOKEN`
+  (`setup-token` does not write `.credentials.json`; macOS host creds are in the Keychain, not copyable).
+- **Codex** — the container does its **own** `codex login` (NOT seeding/copying — ChatGPT refresh tokens
+  are single-use, so a shared login 401s on first refresh). The `127.0.0.1:1455` OAuth callback is
+  forwarded in via a `socat` hop (`-p 1455:8455` → `TCP:127.0.0.1:1455`).
+
+`scripts/docker-login.sh` is **idempotent** (checks logins live, logs in only the missing one[s]);
+`scripts/docker-auth-status.sh` + the entrypoint preflight report status. The benchmark is deliberately
+NOT in the image. Full plan: `docs/docker-dev-plan.md`.
 
 ## Architecture
 
 ### Entry Point
 - `pentestgpt/interface/main.py` — CLI entry, argument parsing, raw streaming output, telemetry setup.
-- Command: `pentestgpt --target <IP/URL> [--mode ctf|pentest] [--model M] [--instruction "hint"] [--list-sessions] [--debug] [--no-telemetry]`
+- Command: `pentestgpt --target <IP/URL> [--mode ctf|pentest] [--backend claude|codex] [--model M] [--instruction "hint"] [--list-sessions] [--debug] [--no-telemetry]`
+  - `--backend` (default `claude`) selects the runtime. With `codex`, `--model` takes a Codex id (`gpt-5.5`, `gpt-5.4-mini`; default `gpt-5.5`); reasoning effort is set via `PENTESTGPT_CODEX_EFFORT` (default `medium`). With `PENTESTGPT_BENCH=1`, the Codex backend prints a greppable `[CODEX_USAGE]` token line per turn (benchmark observability).
 
 ### Core Layer (`pentestgpt/core/`)
 - **pipeline.py** — `PipelineOrchestrator`: runs a fixed sequence of stages, each with a fresh backend + controller. Data classes: `PipelineMode` (CTF/PENTEST), `StageDefinition` (name, display_name, `get_system_prompt`, `get_task_prompt`), `StageResult`, `PipelineResult` (`success`, `all_flags`, `total_cost`, `combined_output`). Each stage's output + flags are injected into the next stage's task prompt. `run()` executes **every** stage in order — it only breaks early on an explicit user `stop()`, and on a stage error it logs a warning and continues so later stages still get partial context. Flag capture does **not** short-circuit the pipeline.
 - **pipelines.py** — Factory that assembles the stage lists. `CTF_STAGES` = recon → exploit (DFS) → walkthrough; `PENTEST_STAGES` = asset_identification → vulnerability_identification (BFS) → report. `get_stages(mode)` returns the list for a `PipelineMode`.
-- **backend.py** — `AgentBackend` interface + `ClaudeCodeBackend` implementation (framework-agnostic). `ClaudeCodeBackend` spawns `claude -p` and parses streaming JSON into `AgentMessage`s (`MessageType`: TEXT, TOOL_START, TOOL_RESULT, RESULT, ERROR). Supports session resume.
+- **backend.py** — `AgentBackend` interface + two implementations. `ClaudeCodeBackend` spawns `claude -p` and parses streaming JSON into `AgentMessage`s (`MessageType`: TEXT, TOOL_START, TOOL_RESULT, RESULT, ERROR); supports session resume. `CodexBackend` wraps `unified_agent.backends.codex` (FULL_ACCESS sandbox, native shell) and translates its normalized `AgentEvent`s into the same `AgentMessage`s, so the pipeline is runtime-agnostic. `pipeline.py` picks the class from `config.backend`. Only assistant TEXT is flag-scanned (parity across backends); Codex `cost_usd` is 0 (ChatGPT-subscription billed) so it reports tokens instead.
 - **controller.py** — `AgentController`: 5-state lifecycle (IDLE→RUNNING→PAUSED→COMPLETED→ERROR), pause/resume/stop/inject at message boundaries. Detects flags via `FLAG_PATTERNS`. Used per-stage by the orchestrator.
 - **events.py** — `EventBus`: singleton pub/sub decoupling the agent from output consumers. `EventType`: STATE_CHANGED, MESSAGE, TOOL, FLAG_FOUND (agent → consumers); USER_COMMAND, USER_INPUT (control → agent).
 - **session.py** — `SessionStore`: file-based JSON persistence in `~/.pentestgpt/sessions/` (`SessionInfo` / `SessionStatus`). A new session is created per stage. `--list-sessions` reads these. Note: `--resume` / `--session-id` are parsed in `main.py` but **not currently wired into the pipeline** — the orchestrator never calls `controller.run(resume_session_id=...)` — so they are no-ops today, even though the controller and `ClaudeCodeBackend` do support resume.
-- **config.py** — `PentestGPTConfig` (pydantic-settings, `.env` support). Key fields: `llm_model` (default `claude-sonnet-4-5-20250929`), `mode` (`ctf`/`pentest`), `working_directory` (default `./workspace`), `permission_mode` (default `bypassPermissions`), `target`, `custom_instruction`. (`max_iterations` exists with default 300 but is currently unused.) `load_config()` / `from_env()`.
+- **config.py** — `PentestGPTConfig` (pydantic-settings, `.env` support). Key fields: `llm_model` (default `claude-sonnet-4-5-20250929`), `backend` (`claude`/`codex`, default `claude`), `mode` (`ctf`/`pentest`), `working_directory` (default `./workspace`; overridable via the `WORKING_DIRECTORY` env var for isolated runs), `permission_mode` (default `bypassPermissions`), `target`, `custom_instruction`. (`max_iterations` exists with default 300 but is currently unused.) `load_config()` / `from_env()`.
 - **langfuse.py** — Optional Langfuse telemetry. Subscribes to the `EventBus` and reports anonymized spans. `init_langfuse()` / `shutdown_langfuse()`; persistent user id in `~/.pentestgpt/user_id`. Disable with `--no-telemetry` or `LANGFUSE_ENABLED=false`.
 
 ### Stage Prompts (`pentestgpt/prompts/`)
@@ -119,6 +139,29 @@ PENTESTGPT_LIVE_SMOKE=1 uv run pytest tests/smoke/test_live_framework_loop.py -v
 Note: `make lint` / `make typecheck` cover `pentestgpt/` (+ legacy via lint); for the new package run
 `uv run ruff check pentestgpt_agent/ unified_agent/` and `uv run mypy pentestgpt_agent/` explicitly.
 
+## Benchmarking (xbow validation-benchmarks)
+
+A host-based multi-model benchmark harness lives in **`benchmark/pilot/`** (see its `README.md` for
+full docs + current status and `REPORT.md` for the latest results). It drives the CTF pipeline across
+four model/runtime combos — Claude `opus`/`sonnet` and Codex `gpt-5.5`/`gpt-5.4-mini` — over the
+[xbow validation-benchmarks](https://github.com/xbow-engineering/validation-benchmarks).
+
+- **`run_pilot.py`** — for each challenge: `make build` (bakes `FLAG{sha256(UPPERCASE-DIR)}`) → fresh
+  `docker compose up` per run → discover the loopback-published port → run
+  `pentestgpt --target http://127.0.0.1:<port> --backend … --model …` with a timeout → judge success
+  by the ground-truth flag appearing in captured stdout → teardown. Resumable (`results.jsonl`).
+- **`report.py`** — renders `REPORT.md`: per-challenge × per-model table + aggregates; excludes
+  infrastructure failures (build/boot errors) from solve denominators.
+- **Status**: a 13-challenge × 4-model *pilot* ran (not the full 59 medium/hard set). Remaining work —
+  full sweep, **dockerized/isolated execution** (so scans don't hit host endpoint monitoring), arm64
+  infra fixes (`mysql:5.7`, EOL-buster images), retries, cost accounting — is tracked in
+  `benchmark/pilot/README.md` and `docs/redesign/pentestgpt-redesign-decisions.html` (Roadmap card).
+
+> The benchmark fixtures are a **separate** checkout (an `xbow-validation-benchmarks` submodule, e.g.
+> at a sibling path), not vendored into this repo. The agents run real offensive tooling (nmap,
+> gobuster, exploit payloads) against loopback Docker targets — run them in an environment where that
+> is authorized and won't trip local security monitoring.
+
 ## Repository Structure
 
 ```
@@ -135,6 +178,7 @@ Note: `make lint` / `make typecheck` cover `pentestgpt/` (+ legacy via lint); fo
 │   ├── llm/              # Native per-provider LLM layer (registry, factory, client, providers)
 │   ├── utils/            # Orchestrator (pentest_gpt.py) + REPL helpers
 │   └── prompts/          # Classic PTT/session prompts
+├── benchmark/pilot/      # Multi-model xbow benchmark harness (run_pilot.py, report.py, REPORT.md)
 ├── tests/                # unit/ integration/ legacy/ docker/ smoke/ + flat test_*.py (substrate + framework)
 └── Makefile              # Development commands
 ```
