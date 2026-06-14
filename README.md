@@ -53,9 +53,9 @@
 
 ## What's New in v1.0 (Agentic Upgrade)
 
-- **Iteration Loop** - The agent runs continuously, maintains a context file with progress, and restarts with prior context when hitting limits. Loop terminates on flag capture or max iterations.
-- **Autonomous Agent** - Agentic pipeline for intelligent, autonomous penetration testing
-- **Session Persistence** - Save and resume penetration testing sessions
+- **Multi-Stage Pipeline** - The agent works through staged phases (recon → exploit → walkthrough for CTF; asset discovery → vulnerability identification → report for pentests), feeding each stage's findings into the next.
+- **Autonomous Agent** - Drives the Claude Code CLI to run tools and reason without human intervention.
+- **Session Persistence** - Save and resume penetration testing sessions.
 
 > **Multi-model support** is available today in the interactive **modernized legacy** mode
 > (`pentestgpt-legacy`) — OpenAI, Anthropic, Google Gemini, DeepSeek, xAI, Qwen, Moonshot, and
@@ -103,17 +103,20 @@ make install    # runs uv sync
 ## Usage
 
 ```bash
-# Run against a target
+# Run against a target (CTF mode by default)
 pentestgpt --target 10.10.11.234
 
 # With challenge context
 pentestgpt --target 10.10.11.50 --instruction "WordPress site, focus on plugin vulnerabilities"
 
-# Limit iterations
-pentestgpt --target 10.10.11.234 --max-iterations 5
+# Penetration-test mode (asset discovery → vulnerabilities → report)
+pentestgpt --target 10.10.11.234 --mode pentest
+
+# List previously saved sessions
+pentestgpt --list-sessions
 ```
 
-The agent runs in an **iteration loop**: it works autonomously, maintains a context file with progress, and restarts with prior context when hitting limits. The loop terminates on flag capture or max iterations (default: 10).
+The agent works through a **multi-stage pipeline**, feeding each stage's findings into the next — recon → exploit → walkthrough for CTF, asset discovery → vulnerability identification → report for pentest.
 
 ---
 

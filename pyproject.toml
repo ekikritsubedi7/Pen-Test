@@ -37,6 +37,10 @@ dependencies = [
     "openai>=1.55.0",
     "anthropic>=0.49.0",
     "google-genai>=1.0.0",
+    "claude-agent-sdk>=0.2.90",
+    "openai-codex>=0.1.0b3",
+    "mcp>=1.23.0",
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]
@@ -53,13 +57,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["pentestgpt", "pentestgpt_legacy"]
+packages = ["pentestgpt", "pentestgpt_legacy", "unified_agent", "pentestgpt_agent"]
 
 # ============================================================================
 # uv Configuration
 # ============================================================================
 
 [tool.uv]
+prerelease = "allow"
 dev-dependencies = [
     "ruff>=0.1.0",
     "mypy>=1.7.0",
@@ -139,4 +144,5 @@ markers = [
     "unit: Unit tests (fast, no external dependencies)",
     "integration: Integration tests (may use mocks)",
     "slow: Slow tests (skip with -m 'not slow')",
+    "live: Live smoke tests that require backend auth and may spend tokens",
 ]
