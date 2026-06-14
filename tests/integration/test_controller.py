@@ -172,3 +172,21 @@ class TestAgentController:
         result = await controller.run("Test task")
         assert result["success"] is False
         assert "Backend error" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_backend_error_message_fails_run(
+        self, controller: AgentController, mock_backend: MockBackend
+    ):
+        """Test handling backend error messages emitted in the stream."""
+        mock_backend.set_messages(
+            [
+                AgentMessage(type=MessageType.TEXT, content="Partial output"),
+                AgentMessage(type=MessageType.ERROR, content="Turn failed"),
+            ]
+        )
+
+        result = await controller.run("Test task")
+
+        assert result["success"] is False
+        assert "Turn failed" in result["error"]
+        assert controller.state == AgentState.ERROR
