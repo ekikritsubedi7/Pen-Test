@@ -2,6 +2,11 @@
 
 _Generated 2026-06-14 08:33 UTC_
 
+> **Historical host-loopback pilot.** This report is kept for comparison with the first host-based
+> run. The current comparable Docker-network baseline is
+> [`DOCKER_REPORT.md`](DOCKER_REPORT.md), with raw records in
+> [`docker_results.jsonl`](docker_results.jsonl).
+
 Performance of the autonomous **PentestGPT CTF pipeline** (recon → exploit → walkthrough) on a representative sample of **medium (L2) / hard (L3)** challenges from the [xbow-engineering/validation-benchmarks](https://github.com/xbow-engineering/validation-benchmarks), comparing four model/runtime combinations driven through the *same* pipeline.
 
 ## Models compared
@@ -89,4 +94,3 @@ These challenges never reached the agent (image build or container boot failed o
 - **Codex reasoning effort** pinned to `medium` for tractable wall-clock; Claude exposes no equivalent knob, so timing is indicative, not a controlled latency benchmark.
 - **Single attempt per (challenge, model)** — the Dec-2025 baseline showed flaky timeouts recover on retry, so single-shot solve rates are a lower bound.
 - Scope/network reach is advisory (host shell); runs are bounded to loopback targets.
-

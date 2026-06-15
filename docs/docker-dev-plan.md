@@ -10,10 +10,11 @@ This plan follows the *existing* build patterns (the `Dockerfile` + `docker-comp
 
 ---
 
-## Implementation status (2026-06-14)
+## Implementation status (2026-06-15)
 
-**Phases 1–3 are built and verified.** The benchmark is intentionally NOT in the image — the image is
-the tool only; the benchmark drives it from outside, later.
+**The tool image, persistent dual-login flow, Docker run target, and a 10-target Docker-network
+benchmark baseline are built and verified.** The benchmark harness is still intentionally outside the
+image: the image is the tool; the benchmark drives it from the host or a dedicated benchmark runner.
 
 - ✅ **Phase 1 — image.** Dockerfile extended: Codex CLI (`@openai/codex`), the missing wheel packages
   (`unified_agent`/`pentestgpt_agent`/`pentestgpt_legacy`), `gobuster`/`dirb`, a `.codex` auth dir, and
@@ -33,22 +34,29 @@ the tool only; the benchmark drives it from outside, later.
   pipeline (Codex) against an isolated fixture (internal docker bridge, no host ports) and **captured the
   flag** with no sandbox/exec errors; the pentest pipeline ran all stages cleanly too — both backends
   authenticate from the persisted volumes.
-- ⬜ **Phases 4–6** (isolated-network mode for real targets, benchmark wiring from outside, CI test) remain.
+- ✅ **Phase 4 — Docker-network benchmark execution.** A 10-target xbow baseline completed with the tool
+  container joined to each target's Docker network and attacking the target container IP directly.
+  Results: `benchmark/pilot/DOCKER_REPORT.md` and `benchmark/pilot/docker_results.jsonl`.
+- ◐ **Phase 5 — reusable benchmark command.** The Docker-network baseline is complete, but the operational
+  harness is not yet committed as a reusable `make docker-bench`/script. Productizing that runner and
+  expanding to the full 59-target medium/hard sweep remain open.
+- ◐ **Phase 6 — Docs/CI.** README, `CLAUDE.md`, benchmark docs, and this plan are being kept in sync.
+  A gated login-persistence CI test and broader Makefile lint/typecheck coverage remain open.
 
 ---
 
 ## 1. Where things stand today (verified)
 
-| Piece | State | Gap for this goal |
+| Piece | Current state | Remaining gap |
 |---|---|---|
-| `Dockerfile` | Ubuntu 24.04 + py3.12 + pentest tools (nmap, ripgrep, …) + Node 20 + **Claude CLI** (native installer) + `uv` + CCR; installs `pentestgpt/` (the fixed pipeline only). Non-root `pentester`. | No **Codex** CLI / `openai_codex` SDK; doesn't install `unified_agent/` or `pentestgpt_agent/`; no benchmark harness; no `gobuster`/`sqlmap`/`nikto`/`ffuf`. |
-| `docker-compose.yml` | Persists `~/.claude` via **named volume `claude-config`**; CCR volume; host-gateway; `NET_ADMIN`. | No **`codex-config`** volume; no results/fixtures mounts; no login service; arch (`linux/amd64`) not pinned. |
-| `scripts/entrypoint.sh` | Auth-mode dispatch: `openrouter`/`local` (CCR), `anthropic` (API key), `manual` (`claude login`). | No Codex auth handling; no "are both CLIs logged in?" preflight. |
-| Makefile | `build` = `uv build` (python), `run` = local. | **No docker targets at all** (`docker-build`, `docker-login`, `docker-run`, `docker-bench`). |
+| `Dockerfile` | Ubuntu 24.04 + Python 3.12 + pentest tools (`nmap`, `gobuster`, `dirb`, `ripgrep`, etc.) + Node 20 + Claude CLI + Codex CLI + `uv`; installs `pentestgpt/`, `unified_agent/`, `pentestgpt_agent/`, and `pentestgpt_legacy/`. Non-root `pentester`. | Benchmark harness and Docker CLI are not in the image by design; full scanner set (`sqlmap`, `nikto`, `ffuf`) is still optional/open. |
+| `docker-compose.yml` | Persists Claude, Codex, and CCR config through explicit named volumes (`pentestgpt-claude`, `pentestgpt-codex`, `ccr-config`); exposes `host.docker.internal`; keeps `NET_ADMIN` for VPN workflows. | No benchmark compose profile or results/fixtures mounts yet. |
+| `scripts/entrypoint.sh` | Supports `openrouter`, `local`, `anthropic`, and `manual`; loads persisted Claude OAuth token; reports Claude/Codex auth status in manual mode. | Preflight is advisory today; it warns instead of hard-failing unauthenticated runs. |
+| Makefile | Provides `docker-build`, `docker-login`, `docker-auth-status`, `docker-shell`, `docker-run`, `docker-down`, and `docker-nuke`. | No committed `docker-bench` or `docker-test-matrix` target yet. |
 | Auth — **Claude** | macOS host → **Keychain** (not a portable file). Linux container → `~/.claude/.credentials.json` (file). `claude setup-token` issues a long-lived token via **code-paste** (no localhost callback). | First login must happen **inside** the container (mac creds can't be copied); then persisted by `claude-config`. |
-| Auth — **Codex** | **File-based, portable**: `~/.codex/auth.json` (`auth_mode`, `tokens`, `last_refresh`) + `~/.codex/config.toml`. `codex login` = ChatGPT OAuth (browser + localhost callback); `codex login --with-api-key` = API key via stdin. | Add a `codex-config` volume; seed from host **or** login in-container (callback port). |
+| Auth — **Codex** | Container performs its own `codex login`; the `localhost:1455` OAuth callback is forwarded into the container via `socat`; session persists in the `pentestgpt-codex` volume. | API-key fallback is documented but not part of the default Make flow. |
 | Backend wiring | `pentestgpt --backend {claude,codex}` already implemented (`pentestgpt/core/backend.py`). | — |
-| Benchmark harness | `benchmark/pilot/run_pilot.py` runs on host today, builds/ups xbow stacks, publishes to loopback. | Make it run *inside* the container and reach the target over Docker networking. |
+| Benchmark harness | Host-loopback harness remains in `benchmark/pilot/run_pilot.py`; Docker-network baseline results are committed in `DOCKER_REPORT.md`/`docker_results.jsonl`. | Commit/reuse the Docker-network runner as an in-repo command and scale beyond the 10-target baseline. |
 
 **Design driver:** the only genuinely hard problem is **persisting two independent login sessions**.
 Everything else is packaging. The two auth systems behave differently, so they get different (but
@@ -58,18 +66,15 @@ symmetric) handling, both ending in a **named volume** so login survives contain
 
 ## 2. Success criteria (Definition of Done)
 
-1. `make docker-build` produces an image with the full solution + both CLIs + the pentest toolchain.
-2. `make docker-login` — a **one-time** interactive step — leaves **both** Claude and Codex
-   authenticated in persistent volumes. Re-running any container afterward needs **no login**.
-3. `make docker-run TARGET=… BACKEND=… MODEL=… MODE=…` runs the pipeline against an xbow target and
-   writes results to a host-visible directory.
-4. `make docker-bench` runs the multi-model benchmark harness end-to-end inside Docker and produces
-   `REPORT.md`.
-5. A **login-persistence test** proves that after `down`/recreate (volumes kept), both CLIs are still
-   logged in (verified by `claude` and `codex login status` non-interactively, and one real 1-token
-   round-trip each).
-6. Works for **multiple pipelines/settings**: CTF & pentest modes; Claude (`opus`/`sonnet`) & Codex
-   (`gpt-5.5`/`gpt-5.4-mini`); and a smoke of the next-gen `pentestgpt_agent` framework.
+| Criterion | Status |
+|---|---|
+| `make docker-build` produces an image with the full solution + both CLIs + the core pentest toolchain. | Done |
+| `make docker-login` leaves both Claude and Codex authenticated in persistent volumes; later containers need no login. | Done and live-verified with `make docker-auth-status`. |
+| `make docker-run TARGET=... BACKEND=... MODEL=... MODE=...` runs the pipeline from the container. | Done. |
+| Docker-network benchmark execution avoids host-loopback target URLs. | Done for the 10-target baseline in `DOCKER_REPORT.md`. |
+| `make docker-bench` runs the multi-model benchmark harness end-to-end and produces a report. | Open: the operational Docker harness worked but is not yet committed/productized. |
+| A gated login-persistence test proves auth survives down/recreate. | Open: manual/live verification exists; CI test remains. |
+| Full 59-target medium/hard xbow sweep. | Open. Current Docker baseline is 10 targets. |
 
 ---
 
@@ -133,22 +138,24 @@ the one(s) that fail** — then re-verifies. Re-running it when both are valid i
 
 ---
 
-## 4. Image design (extend the existing Dockerfile)
+## 4. Image design (implemented shape)
 
-Add to the current image (keep the structure; layer additions so caching stays good):
-1. **Codex CLI** — install the `codex` binary (npm `@openai/codex` or the official installer) for the
-   `pentester` user; ensure it's on `PATH`.
-2. **Python deps** — install the project with the **codex extra** so `openai_codex` (the SDK the
-   `CodexBackend` imports) is present: `uv pip install --system /app` over a `pyproject` that includes
-   `unified_agent`/`pentestgpt_agent` deps. Copy `unified_agent/`, `pentestgpt_agent/`, and
-   `benchmark/` into the image (today only `pentestgpt/` is copied).
-3. **Pentest toolchain** the agents actually call — add `gobuster`, `ffuf`, `nikto`, `sqlmap`,
-   `seclists`/wordlists, plus the existing `nmap`. (These showed up in the live logs.)
-4. **Docker CLI** (client only) — so the in-container benchmark harness can drive `docker compose` for
-   the xbow target stacks (talks to a mounted host socket; see §5).
-5. Pin **`DOCKER_DEFAULT_PLATFORM=linux/amd64`** as an env default for target builds (fixes
-   `mysql:5.7` / EOL-buster on arm64).
-6. Keep the non-root `pentester` user, the entrypoint, and CCR (unchanged) for backward compat.
+The image is the tool runtime, not the benchmark runner:
+
+1. **Agent runtimes** — Claude CLI and Codex CLI are installed for the `pentester` user and available on
+   `PATH`.
+2. **Python packages** — the wheel includes `pentestgpt/`, `unified_agent/`, `pentestgpt_agent/`, and
+   `pentestgpt_legacy/`, so the fixed pipeline, substrate, next-gen framework, and legacy CLI import in
+   the container.
+3. **Pentest toolchain** — the image includes `nmap`, `gobuster`, `dirb`, `netcat`, `curl`, `jq`,
+   `ripgrep`, DNS/network utilities, OpenVPN, and tmux. `sqlmap`, `nikto`, `ffuf`, and large wordlists
+   are still optional future additions.
+4. **Auth helpers** — `entrypoint.sh` exports the persisted Claude OAuth token and reports Claude/Codex
+   auth status; `docker-auth-status.sh` can also do optional live round-trips.
+5. **Out of image by design** — `benchmark/`, credentials, workspace state, run artifacts, and caches
+   are excluded by `.dockerignore`. The benchmark runner drives `pentestgpt:latest` from outside.
+6. **Compatibility** — keep the non-root `pentester` user, CCR support, and `/workspace` default
+   working directory for backward compatibility.
 
 > Multi-stage optional later for size; not required for v1.
 
@@ -157,20 +164,21 @@ Add to the current image (keep the structure; layer additions so caching stays g
 ## 5. Targets, networking & results
 
 The agent must reach the xbow target but **not** trip host endpoint monitoring (the reason a prior host
-run was halted). Two supported modes, selectable by a compose profile:
+run was halted). Two modes matter:
 
-- **Mode A — co-located isolated network (recommended).** The harness brings up each xbow stack with
-  **no host-published ports** on an **`--internal` Docker bridge**, and the agent container joins that
-  bridge (reaching the target by service name) plus a second NAT NIC for model-API egress only. Scan
-  traffic stays on the bridge — never on host loopback. (This is the design from
-  `benchmark/pilot/README.md` → "run the whole sweep in Docker".)
-- **Mode B — simple loopback (today's behavior).** Targets publish to loopback and the agent uses
-  `host.docker.internal`. Easier, but scans cross host endpoints — only for already-isolated hosts/VMs.
+- **Mode A — Docker-network target access (recommended and baseline-tested).** The harness brings up
+  each xbow stack with Docker Compose, starts the PentestGPT tool container on the target's Docker
+  network, discovers the target container IP, and points the agent at `http://172.x.x.x:<port>`.
+  `DOCKER_REPORT.md`/`docker_results.jsonl` use this mode for all 40 records.
+- **Mode B — simple loopback (legacy host harness).** Targets publish to loopback and the host agent
+  uses `http://127.0.0.1:<port>`. Easier, but scans cross host endpoints; use only on an isolated
+  host/VM.
 
-**Docker-driving-Docker:** mount `/var/run/docker.sock` into the agent container so the harness can
-`make build` / `docker compose up` the target stacks (simplest), **or** run true DinD for full nesting.
-**Results & fixtures:** bind-mount `./benchmark/pilot/{results.jsonl,logs,REPORT.md}` and the xbow
-fixtures path out of the container so results persist and runs stay resumable.
+**Docker-driving-Docker:** the current operational harness ran on the host and used the host Docker
+daemon to build/compose targets and run tool containers. A future in-repo `docker-bench` runner can
+either keep that host-orchestrated shape (simplest) or run inside a controller container with the Docker
+socket mounted. **Results & fixtures:** keep `benchmark/pilot/*results.jsonl`, reports, and logs on the
+host so runs are resumable and reviewable.
 
 ---
 
@@ -178,17 +186,24 @@ fixtures path out of the container so results persist and runs stay resumable.
 
 ```
 make docker-build         # docker compose build (image with both CLIs + full solution)
-make docker-login         # ONE-TIME: interactive claude setup-token + codex login/seed -> volumes
+make docker-login         # ONE-TIME: interactive claude setup-token + codex login -> volumes
 make docker-auth-status   # non-interactive check both CLIs are authed (used by CI + preflight)
 make docker-shell         # interactive shell in the container (volumes attached)
 make docker-run TARGET=http://… BACKEND=claude MODEL=opus MODE=ctf
-make docker-bench BENCHES=XBEN-001-24,… COMBOS=… TIMEOUT=540   # the multi-model harness
 make docker-down          # stop (KEEP volumes — stays logged in)
 make docker-nuke          # stop + remove volumes (forces re-login) — explicit, separate target
 ```
 
-Entrypoint gains a **preflight**: if `PENTESTGPT_AUTH_MODE=manual` and either CLI is unauthenticated,
-print "run `make docker-login`" and exit non-zero (fail fast, not mid-run).
+Planned but not committed yet:
+
+```
+make docker-bench BENCHES=XBEN-001-24,… COMBOS=… TIMEOUT=540
+make docker-test-matrix
+```
+
+Entrypoint has an auth preflight report: if `PENTESTGPT_AUTH_MODE=manual` and either CLI is
+unauthenticated, it prints "run `make docker-login`" before the command starts. It currently warns
+rather than hard-failing.
 
 ---
 
@@ -222,13 +237,14 @@ works in-container before any large benchmark run. The full benchmark sweep reus
   both CLIs succeed with **no** re-login.
 - **Phase 3 — Single run.** `make docker-run` against one xbow target (Mode B first). ✔ flag captured;
   results written to host.
-- **Phase 4 — Isolated networking (Mode A).** Internal bridge + co-located agent + no host ports.
-  ✔ target reachable from agent; **no** benchmark traffic on host loopback (verify with a host-side
-  capture); ✔ `DOCKER_DEFAULT_PLATFORM=linux/amd64` makes a `mysql:5.7` challenge boot.
-- **Phase 5 — Benchmark + matrix.** Wire `make docker-bench` and `make docker-test-matrix`. ✔ a small
-  sweep across all four combos + a framework smoke all run in-container; `REPORT.md` generated.
-- **Phase 6 — Docs/CI.** Update README + CLAUDE.md (docker quickstart), add a `tests/docker/` marker
-  test for the login-persistence invariant (gated, opt-in like the live smoke).
+- **Phase 4 — Docker-network target access.** ✔ 10-target xbow baseline completed with the tool
+  container on the target Docker network and target URLs set to container IPs.
+- **Phase 5 — Benchmark + matrix.** ◐ `DOCKER_REPORT.md` generated for 10 targets × 4 combos. Open:
+  commit/productize the Docker-network harness as `make docker-bench`, add `make docker-test-matrix`,
+  and run the full 59-target medium/hard sweep.
+- **Phase 6 — Docs/CI.** ◐ Docs updated with the Docker baseline. Open: add a gated
+  login-persistence test and broaden Makefile lint/typecheck coverage for `unified_agent/` and
+  `pentestgpt_agent/`.
 
 Each phase is independently verifiable; Phase 2 is the linchpin and is gated by the persistence test.
 
@@ -238,16 +254,16 @@ Each phase is independently verifiable; Phase 2 is the linchpin and is gated by 
 
 | File | Change |
 |---|---|
-| `Dockerfile` | Add codex CLI, `openai_codex`, copy `unified_agent/ pentestgpt_agent/ benchmark/`, add scanners + docker CLI, `DOCKER_DEFAULT_PLATFORM` env, ensure codex on PATH. |
-| `docker-compose.yml` | Add `codex-config` volume; results/fixtures bind-mounts; `login` + `bench` compose profiles; optional internal network; docker-socket mount for the harness. |
-| `scripts/entrypoint.sh` | Add Codex preflight + a unified "both-authed?" check; keep CCR/anthropic/manual modes. |
-| `scripts/docker-login.sh` (new) | Orchestrate claude `setup-token` + codex seed/login with clear prompts + final verification. |
-| `scripts/docker-auth-status.sh` (new) | Non-interactive dual-auth check (exit codes for CI/preflight). |
-| `Makefile` | New `docker-build/login/auth-status/shell/run/bench/test-matrix/down/nuke` targets. |
-| `.dockerignore` (new) | Exclude `.env*`, `~/.claude`, `~/.codex`, `workspace/`, `runs/`, `benchmark/**/logs`, caches. |
-| `benchmark/pilot/run_pilot.py` | Add an in-container mode: discover target via Docker DNS / `host.docker.internal`; honor `DOCKER_DEFAULT_PLATFORM`; configurable fixtures path. |
-| `README.md` / `CLAUDE.md` | Docker quickstart: install once → `make docker-login` → `make docker-run`/`docker-bench`. |
-| `tests/docker/test_login_persistence.py` (new, gated) | Recreate-with-volumes invariant + dual round-trip. |
+| `Dockerfile` | Implemented: Codex CLI, Claude CLI, `unified_agent/`, `pentestgpt_agent/`, `pentestgpt_legacy/`, core pentest tools, and auth-status helper. Benchmark harness stays outside the image. |
+| `docker-compose.yml` | Implemented: explicit Claude/Codex/CCR volumes shared with Make targets. Open: benchmark profile/results mounts. |
+| `scripts/entrypoint.sh` | Implemented: persisted Claude token export and dual-auth status report; CCR/anthropic/manual modes kept. |
+| `scripts/docker-login.sh` | Implemented: idempotent Claude `setup-token` + separate in-container Codex login with final live verification. |
+| `scripts/docker-auth-status.sh` | Implemented: non-interactive auth status, optional `--roundtrip`. |
+| `Makefile` | Implemented: `docker-build/login/auth-status/shell/run/down/nuke`. Open: `docker-bench` and `docker-test-matrix`. |
+| `.dockerignore` | Implemented: excludes credentials, env files, workspace, benchmark artifacts, and caches from image layers. |
+| `benchmark/pilot/run_pilot.py` | Host-loopback harness remains; Docker-network baseline was produced by an operational external harness. Open: move Docker-network mode into repo. |
+| `README.md` / `CLAUDE.md` / `benchmark/pilot/README.md` | Document Docker quickstart, current Docker baseline, and remaining benchmark work. |
+| `tests/docker/test_login_persistence.py` | Open: gated recreate-with-volumes invariant + dual round-trip. |
 
 ---
 
@@ -255,7 +271,7 @@ Each phase is independently verifiable; Phase 2 is the linchpin and is gated by 
 
 | Risk | Mitigation |
 |---|---|
-| Codex OAuth callback port unknown / Docker-Desktop localhost quirks | Prefer **seed-from-host** for codex (portable file); for in-container login publish the confirmed callback port or use `--network host` on Linux; document `--with-api-key` fallback. |
+| Codex OAuth callback port / Docker Desktop localhost quirks | Use the implemented in-container `codex login` plus `socat` callback forwarding; do **not** seed/copy host ChatGPT tokens. Document `--with-api-key` as a separate fallback. |
 | Claude creds not copyable from macOS Keychain | In-container `claude setup-token` (code-paste) is the primary path — host-independent. |
 | Tokens expire after long idle | Entrypoint preflight detects + instructs `make docker-login`; document expected longevity. |
 | arm64 image incompatibilities (mysql:5.7, EOL-buster) | `DOCKER_DEFAULT_PLATFORM=linux/amd64` default; document slower emulated targets → higher timeouts. |

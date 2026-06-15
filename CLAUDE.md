@@ -31,6 +31,7 @@ make check                                # lint + typecheck
 # Docker (the tool, with persistent Claude + Codex login)
 make docker-build                         # Build the tool image (tool only; NO benchmark)
 make docker-login                         # ONE-TIME: persist Claude + Codex logins into named volumes
+make docker-auth-status                   # Check persisted Claude + Codex auth
 make docker-run TARGET=… BACKEND=… MODEL=… MODE=…   # Run the pipeline against a target
 ```
 
@@ -45,8 +46,10 @@ auth handling because their token models differ:
   forwarded in via a `socat` hop (`-p 1455:8455` → `TCP:127.0.0.1:1455`).
 
 `scripts/docker-login.sh` is **idempotent** (checks logins live, logs in only the missing one[s]);
-`scripts/docker-auth-status.sh` + the entrypoint preflight report status. The benchmark is deliberately
-NOT in the image. Full plan: `docs/docker-dev-plan.md`.
+`scripts/docker-auth-status.sh` + the entrypoint preflight report status. The benchmark harness is
+deliberately NOT in the image; it drives the tool container from outside. Current Docker-network
+benchmark artifacts live in `benchmark/pilot/DOCKER_REPORT.md` and
+`benchmark/pilot/docker_results.jsonl`. Full plan/status: `docs/docker-dev-plan.md`.
 
 ## Architecture
 
@@ -141,21 +144,21 @@ Note: `make lint` / `make typecheck` cover `pentestgpt/` (+ legacy via lint); fo
 
 ## Benchmarking (xbow validation-benchmarks)
 
-A host-based multi-model benchmark harness lives in **`benchmark/pilot/`** (see its `README.md` for
-full docs + current status and `REPORT.md` for the latest results). It drives the CTF pipeline across
-four model/runtime combos — Claude `opus`/`sonnet` and Codex `gpt-5.5`/`gpt-5.4-mini` — over the
+A multi-model benchmark workspace lives in **`benchmark/pilot/`**. It compares four model/runtime
+combos — Claude `opus`/`sonnet` and Codex `gpt-5.5`/`gpt-5.4-mini` — over the
 [xbow validation-benchmarks](https://github.com/xbow-engineering/validation-benchmarks).
 
-- **`run_pilot.py`** — for each challenge: `make build` (bakes `FLAG{sha256(UPPERCASE-DIR)}`) → fresh
-  `docker compose up` per run → discover the loopback-published port → run
-  `pentestgpt --target http://127.0.0.1:<port> --backend … --model …` with a timeout → judge success
-  by the ground-truth flag appearing in captured stdout → teardown. Resumable (`results.jsonl`).
-- **`report.py`** — renders `REPORT.md`: per-challenge × per-model table + aggregates; excludes
-  infrastructure failures (build/boot errors) from solve denominators.
-- **Status**: a 13-challenge × 4-model *pilot* ran (not the full 59 medium/hard set). Remaining work —
-  full sweep, **dockerized/isolated execution** (so scans don't hit host endpoint monitoring), arm64
-  infra fixes (`mysql:5.7`, EOL-buster images), retries, cost accounting — is tracked in
-  `benchmark/pilot/README.md` and `docs/redesign/pentestgpt-redesign-decisions.html` (Roadmap card).
+- **Current Docker baseline**: `DOCKER_REPORT.md` + `docker_results.jsonl`. Coverage is 10
+  representative medium/hard targets × 4 model combos = 40 Docker-network records. The target stack ran
+  via Docker Compose; the PentestGPT tool container joined the target Docker network and attacked the
+  target container IP directly (`172.x`), not a host-loopback port. Baseline commit in the records:
+  `dca0019`; image digest:
+  `sha256:0c4c0f3e319bff7fc83996876fbfe143b1fae3455db6c2aa4a24117d88c893f5`.
+- **Host pilot**: `run_pilot.py` + `report.py` + `REPORT.md` remain as the older loopback-published
+  harness/report. It was halted after 47/52 runs because scans tripped host endpoint-security monitoring.
+- **Open benchmark work**: productize the Docker-network harness as an in-repo `make docker-bench` or
+  script, run the full 59-target medium/hard sweep, fix/document arm64 fixture issues, add retries, and
+  normalize cost accounting.
 
 > The benchmark fixtures are a **separate** checkout (an `xbow-validation-benchmarks` submodule, e.g.
 > at a sibling path), not vendored into this repo. The agents run real offensive tooling (nmap,
@@ -178,7 +181,7 @@ four model/runtime combos — Claude `opus`/`sonnet` and Codex `gpt-5.5`/`gpt-5.
 │   ├── llm/              # Native per-provider LLM layer (registry, factory, client, providers)
 │   ├── utils/            # Orchestrator (pentest_gpt.py) + REPL helpers
 │   └── prompts/          # Classic PTT/session prompts
-├── benchmark/pilot/      # Multi-model xbow benchmark harness (run_pilot.py, report.py, REPORT.md)
+├── benchmark/pilot/      # Multi-model xbow benchmark reports (DOCKER_REPORT.md current baseline)
 ├── tests/                # unit/ integration/ legacy/ docker/ smoke/ + flat test_*.py (substrate + framework)
 └── Makefile              # Development commands
 ```

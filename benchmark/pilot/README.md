@@ -1,8 +1,9 @@
-# PentestGPT multi-model benchmark harness
+# PentestGPT multi-model benchmark results
 
-Host-based harness that measures the **autonomous PentestGPT CTF pipeline** against the
-[xbow-engineering/validation-benchmarks](https://github.com/xbow-engineering/validation-benchmarks),
-comparing four model/runtime combinations driven through the *same* pipeline:
+This directory tracks the **autonomous PentestGPT CTF pipeline** against the
+[xbow-engineering/validation-benchmarks](https://github.com/xbow-engineering/validation-benchmarks).
+It contains the original host-loopback harness plus the current Docker-network baseline, comparing
+four model/runtime combinations driven through the *same* pipeline:
 
 | Combo | Runtime | Model id | Billing |
 |---|---|---|---|
@@ -14,11 +15,11 @@ comparing four model/runtime combinations driven through the *same* pipeline:
 This was enabled by making the pipeline backend-pluggable: `pentestgpt --backend {claude,codex}`
 (`CodexBackend` in `pentestgpt/core/backend.py`).
 
-> ⚠️ **Safety / authorization.** The agents run *real* offensive tooling (nmap, gobuster, nikto,
+> **Safety / authorization.** The agents run *real* offensive tooling (nmap, gobuster, nikto,
 > sqlmap, command-injection / deserialization RCE payloads) against the benchmark targets. Run this
 > **only** where that is authorized and where it will not trip local endpoint-security monitoring.
-> A pilot run on a monitored workstation was halted mid-sweep for exactly this reason — which is the
-> motivation for the [Dockerized isolated run](#proposal-run-the-whole-sweep-in-docker) below.
+> The older host-loopback pilot was halted mid-sweep for exactly this reason. The current Docker
+> baseline avoids host-loopback target URLs by running the tool container on the target Docker network.
 
 ---
 
@@ -30,7 +31,10 @@ This was enabled by making the pipeline backend-pluggable: `pentestgpt --backend
 | `report.py` | Renders `REPORT.md` (per-challenge × per-model table + aggregates) from `results.jsonl`. |
 | `results.jsonl` | One JSON record per `(challenge, model)` run. Source of truth; re-run skips completed pairs. |
 | `logs/<challenge>__<combo>.log` | Full captured stdout per run. |
-| `REPORT.md` | Generated report. |
+| `REPORT.md` | Generated report for the older host-loopback pilot. |
+| `docker_results.jsonl` | Source-of-truth records for the completed Docker-network baseline. |
+| `DOCKER_REPORT.md` | Current comparable Docker-network baseline report. |
+| `docker_logs/<challenge>__<combo>.log` | Full captured stdout per Docker-network run. |
 | `selected.json` | The challenge set used for the last run. |
 
 ## Prerequisites
@@ -41,7 +45,7 @@ This was enabled by making the pipeline backend-pluggable: `pentestgpt --backend
 - Authenticated `claude` CLI and `codex` CLI on `PATH` (`claude` logged in; `codex login`).
 - `uv sync` in the repo root.
 
-## Usage
+## Usage: host-loopback harness
 
 ```bash
 cd benchmark/pilot
@@ -62,7 +66,11 @@ uv run python report.py
 Useful env vars: `PILOT_CODEX_EFFORT` (default `medium`), `PILOT_COMBOS` (subset of combo keys),
 `DOCKER_DEFAULT_PLATFORM=linux/amd64` (force amd64 emulation for arm64-incompatible images).
 
-## How it works
+These commands reproduce/update the historical `REPORT.md` host-loopback report. `DOCKER_REPORT.md`
+is the committed Docker-network baseline; productizing its runner/renderer into this directory is
+listed under remaining tasks.
+
+## How the host-loopback harness works
 
 1. **Build** — `make build` in the challenge dir. This bakes the ground-truth flag
    `FLAG{sha256(UPPERCASE-DIRNAME)}` into the image (per the benchmarks' `common.mk`). This is the
@@ -85,19 +93,39 @@ failures are classified as **infrastructure** and excluded from solve-rate denom
 
 ## Current status
 
-A **13-challenge × 4-model pilot** was run (not the full 59 medium/hard set), then halted early when
-its scans tripped host endpoint-security monitoring. **47 of 52** runs completed; **8** challenges were
-runnable, **6** fully covered by all four models. See `REPORT.md` for the table. Headline
-(fully-covered subset): Codex `gpt-5.5` 5/6 · Claude Opus 3/6 · Claude Sonnet 2/6 · Codex `gpt-5.4-mini` 2/6.
+### Docker-network baseline
+
+`DOCKER_REPORT.md` is the current comparable baseline. It covers **10 representative medium/hard
+targets** (8 level-2, 2 level-3) across all four model/runtime combinations: **40 Docker-network
+runs** total. The xbow target stack ran via Docker Compose; the PentestGPT tool container joined the
+target Docker network and attacked the target container IP directly (`172.x`), not a host-loopback
+published port.
+
+| Model | Solved | Solve rate | Avg solved time | Accounting |
+|---|---:|---:|---:|---|
+| Codex `gpt-5.5` | 7/10 | 70% | 424s | 11,589,909 tokens |
+| Claude Sonnet | 6/10 | 60% | 458s | $1.83 captured |
+| Claude Opus | 5/10 | 50% | 304s | $5.97 captured |
+| Codex `gpt-5.4-mini` | 3/10 | 30% | 427s | 10,181,137 tokens |
+
+The Docker baseline was run against git commit `dca0019` and image digest
+`sha256:0c4c0f3e319bff7fc83996876fbfe143b1fae3455db6c2aa4a24117d88c893f5`.
+
+### Host-loopback pilot
+
+`REPORT.md` is kept for historical comparison. That **13-challenge × 4-model pilot** was halted early
+when scans tripped host endpoint-security monitoring. **47 of 52** runs completed; **8** challenges
+were runnable; **6** were fully covered by all four models. Fully-covered headline: Codex `gpt-5.5`
+5/6, Claude Opus 3/6, Claude Sonnet 2/6, Codex `gpt-5.4-mini` 2/6.
 
 ---
 
 ## Remaining tasks
 
-- [ ] **Full medium/hard sweep** — all 59 challenges (51 L2 + 8 L3) × 4 models. Only a 13-challenge
-      pilot ran.
-- [ ] **Dockerized / isolated execution** — see the proposal below; the gating blocker for a full
-      run on a monitored host.
+- [x] **Comparable Docker baseline** — 10 representative L2/L3 targets × 4 models, container-to-container.
+- [ ] **Productize the Docker-network harness** — commit an in-repo `make docker-bench`/script instead
+      of relying on the one-off operational harness used for `DOCKER_REPORT.md`.
+- [ ] **Full medium/hard sweep** — all 59 challenges (51 L2 + 8 L3) × 4 models.
 - [ ] **arm64 infra fixes** — `mysql:5.7` has no arm64 manifest (XBEN-040/078); several XSS images
       are EOL Debian-buster/phantomjs (apt 404: XBEN-091/093/100). Fix with `DOCKER_DEFAULT_PLATFORM=linux/amd64`
       emulation, a `mariadb` swap, or an `archive.debian.org` apt pin; else document as excluded.
@@ -106,25 +134,29 @@ runnable, **6** fully covered by all four models. See `REPORT.md` for the table.
 - [ ] **Multi-attempt (best-of-k)** — the Dec-2025 baseline showed flaky timeouts recover on retry;
       single-shot solve rates are a lower bound.
 - [ ] **Codex effort sweep** — currently pinned `medium`; compare low/medium/high.
-- [ ] **Tests/CI** — unit test for the `CodexBackend` event→`AgentMessage` translation; wire
-      `pentestgpt_agent/` + `unified_agent/` into Makefile lint/typecheck.
+- [ ] **Tests/CI** — `CodexBackend` translation has unit coverage; still wire `pentestgpt_agent/` +
+      `unified_agent/` into Makefile lint/typecheck.
 
 ---
 
-## Proposal: run the whole sweep in Docker
+## Docker-network execution model
 
 **Problem.** The agents must perform aggressive scanning/exploitation to solve CTFs, and on a
 monitored workstation that traffic (a) trips host endpoint-security and (b) hits arch-specific build
 failures. We want to run the *entire* 59-challenge × 4-model sweep unattended, isolated from host
 monitoring, and reproducibly.
 
-**Key insight.** Today the harness publishes each target to host loopback (`127.0.0.1:<port>`) and
+**Key insight.** The host-loopback harness publishes each target to host loopback (`127.0.0.1:<port>`) and
 runs the agent on the host — so all scan traffic crosses **host** endpoints that EDR watches. If
 instead the **agent and the target sit on the same internal Docker bridge with no host-published
 ports**, the scan/exploit traffic is container→container on an isolated network and never touches a
 host endpoint. The only traffic leaving is the model-API HTTPS calls (ordinary, allowed egress).
 
-### Recommended architecture
+The current 10-target Docker baseline used the core of this design: the target stack ran in Docker,
+the tool ran in `pentestgpt:latest`, and the tool container joined the target Docker network so scan
+traffic was container-to-container. The reusable in-repo command is still open work.
+
+### Recommended architecture for the full sweep
 
 ```
 ┌──────────────────────────── benchmark host / dedicated VM ─────────────────────────────┐
@@ -147,17 +179,18 @@ host endpoint. The only traffic leaving is the model-API HTTPS calls (ordinary, 
   stay on the bridge. The **agent container** attaches to *both* that internal bridge (to reach the
   target by service name/IP) **and** a normal NAT bridge used *only* for model-API egress.
 - **Agent runs in a container**, not on the host — so its tool processes and scan traffic are
-  contained. Reuse/extend the existing `pentestgpt:latest` image (already has the pentest toolchain);
-  add the `codex` CLI + `openai_codex` SDK + `uv`.
+  contained. Reuse the existing `pentestgpt:latest` image, which already has the pipeline, Claude CLI,
+  Codex CLI, `uv`, and the core pentest toolchain.
 - **Orchestrator** mounts the host Docker socket (`/var/run/docker.sock`) — simplest — or true DinD
   for full nesting. It loops challenges exactly like `run_pilot.py` but creates the per-run internal
   network + connects the agent container instead of publishing ports.
-- **Auth** mounted read-only into the agent container: `~/.claude`, `~/.codex` (or `ANTHROPIC_API_KEY`/
-  ChatGPT creds) so the CLIs are logged in non-interactively.
+- **Auth** mounted into the agent container through the persisted login volumes
+  (`pentestgpt-claude`, `pentestgpt-codex`) so the CLIs are logged in non-interactively and can refresh
+  tokens.
 - **Arch** uniform via `DOCKER_DEFAULT_PLATFORM=linux/amd64` (Rosetta/qemu emulation) so `mysql:5.7`
   and friends build/run everywhere; bump per-run timeout to absorb emulation slowdown.
-- **Persistence** — bind-mount `benchmark/pilot/{results.jsonl,logs,REPORT.md}` out of the runner so
-  results survive and the run stays resumable.
+- **Persistence** — keep `benchmark/pilot/*results.jsonl`, reports, and logs on the host so results
+  survive and the run stays resumable.
 
 ### Why this satisfies the security constraint
 

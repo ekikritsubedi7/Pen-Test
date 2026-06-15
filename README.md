@@ -54,12 +54,13 @@
 ## What's New in v1.0 (Agentic Upgrade)
 
 - **Multi-Stage Pipeline** - The agent works through staged phases (recon → exploit → walkthrough for CTF; asset discovery → vulnerability identification → report for pentests), feeding each stage's findings into the next.
-- **Autonomous Agent** - Drives the Claude Code CLI to run tools and reason without human intervention.
+- **Autonomous Agent** - Drives Claude Code or Codex to run tools and reason without human intervention.
 - **Session Persistence** - Save and resume penetration testing sessions.
 
-> **Multi-model support** is available today in the interactive **modernized legacy** mode
-> (`pentestgpt-legacy`) — OpenAI, Anthropic, Google Gemini, DeepSeek, xAI, Qwen, Moonshot, and
-> local Ollama. See [Interactive Multi-LLM Mode](#interactive-multi-llm-mode-modernized-legacy).
+> The autonomous CTF pipeline is backend-pluggable for Claude Code and Codex. The interactive
+> **modernized legacy** mode (`pentestgpt-legacy`) supports a wider provider set: OpenAI, Anthropic,
+> Google Gemini, DeepSeek, xAI, Qwen, Moonshot, and local Ollama. See
+> [Interactive Multi-LLM Mode](#interactive-multi-llm-mode-modernized-legacy).
 
 ---
 
@@ -79,7 +80,8 @@
 
 - **Python 3.12+**
 - **[uv](https://docs.astral.sh/uv/)** - Python package manager
-- **Claude Code CLI** (`claude`) - installed and authenticated. See [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code)
+- **Claude Code CLI** (`claude`) - installed and authenticated for local Claude runs. See [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code)
+- **Codex CLI** (`codex`) - installed and authenticated for local Codex runs. The Docker flow below bundles both CLIs.
 
 ### Installation
 
@@ -146,8 +148,9 @@ force a fresh login / rotate a token). Design + details: [`docs/docker-dev-plan.
 The classic, human-in-the-loop PentestGPT from the USENIX 2024 paper is preserved and
 modernized as `pentestgpt-legacy`. It runs three cooperating LLM sessions —
 **reasoning / generation / parsing** — that maintain a **Pentesting Task Tree (PTT)** while you
-drive the session interactively (`next`, `more`, `todo`, `discuss`). Unlike the autonomous agent
-(Claude-only), this mode talks **natively** to many providers via their official SDKs.
+drive the session interactively (`next`, `more`, `todo`, `discuss`). The autonomous fixed-stage
+pipeline supports Claude and Codex backends; this legacy mode talks **natively** to many providers
+via their official SDKs.
 
 ### Configure providers
 
@@ -234,12 +237,27 @@ PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW va
 
 ### Multi-model benchmarking
 
-The CTF pipeline is now backend-pluggable (`--backend {claude,codex}`), enabling head-to-head
-comparison of Claude (`opus`/`sonnet`) and OpenAI Codex (`gpt-5.5`/`gpt-5.4-mini`) on the same
-challenges. A reproducible harness lives in [`benchmark/pilot/`](benchmark/pilot/README.md); the
-latest run is in [`benchmark/pilot/REPORT.md`](benchmark/pilot/REPORT.md). The harness and its
-remaining work (full medium/hard sweep, dockerized isolated execution) are tracked in the
-[design doc](docs/redesign/pentestgpt-redesign-decisions.html) roadmap.
+The CTF pipeline is backend-pluggable (`--backend {claude,codex}`), enabling head-to-head comparison
+of Claude (`opus`/`sonnet`) and OpenAI Codex (`gpt-5.5`/`gpt-5.4-mini`) on the same challenges.
+
+The current comparable Docker baseline is
+[`benchmark/pilot/DOCKER_REPORT.md`](benchmark/pilot/DOCKER_REPORT.md): 10 representative medium/hard
+xbow targets, four model/runtime combinations, 40 runs total. The tool ran inside
+`pentestgpt:latest`, joined each target's Docker network, and attacked the target container IP
+directly. Raw records are in
+[`benchmark/pilot/docker_results.jsonl`](benchmark/pilot/docker_results.jsonl).
+
+| Model | Solved | Solve rate | Avg solved time |
+|---|---:|---:|---:|
+| Codex `gpt-5.5` | 7/10 | 70% | 424s |
+| Claude Sonnet | 6/10 | 60% | 458s |
+| Claude Opus | 5/10 | 50% | 304s |
+| Codex `gpt-5.4-mini` | 3/10 | 30% | 427s |
+
+The earlier host-loopback pilot remains in [`benchmark/pilot/REPORT.md`](benchmark/pilot/REPORT.md)
+for historical comparison. Remaining benchmark work is the full 59-target medium/hard sweep,
+productizing the Docker-network harness as an in-repo command, retries/best-of-k, and cost
+normalization.
 
 ---
 
