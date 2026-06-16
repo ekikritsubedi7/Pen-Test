@@ -246,6 +246,9 @@ xbow targets, four model/runtime combinations, 40 runs total. The tool ran insid
 `pentestgpt:latest`, joined each target's Docker network, and attacked the target container IP
 directly. Raw records are in
 [`benchmark/pilot/docker_results.jsonl`](benchmark/pilot/docker_results.jsonl).
+The companion comparison report,
+[`benchmark/pilot/DOCKER_COMPARISON.md`](benchmark/pilot/DOCKER_COMPARISON.md), joins this pipeline
+baseline with the pure single-agent baseline and the current `pentestgpt_agent` framework smoke row.
 
 | Model | Solved | Solve rate | Avg solved time |
 |---|---:|---:|---:|
@@ -255,9 +258,11 @@ directly. Raw records are in
 | Codex `gpt-5.4-mini` | 3/10 | 30% | 427s |
 
 The earlier host-loopback pilot remains in [`benchmark/pilot/REPORT.md`](benchmark/pilot/REPORT.md)
-for historical comparison. Remaining benchmark work is the full 59-target medium/hard sweep,
-productizing the Docker-network harness as an in-repo command, retries/best-of-k, and cost
-normalization. The productized Docker runner should expose a conservative `JOBS`/`--jobs` setting:
+for historical comparison. The reusable Docker-network runner is
+[`benchmark/pilot/run_docker_bench.py`](benchmark/pilot/run_docker_bench.py); it supports
+`single`, `pipeline`, and `framework` variants. Remaining benchmark work is the full 59-target
+medium/hard sweep, adding a Makefile wrapper, retries/best-of-k, and cost normalization. The
+productized wrapper should expose a conservative `JOBS`/`--jobs` setting:
 start with `2`, move to `4` only after a small matrix is clean, and keep each benchmark job in its own
 tool container with a unique target stack, workspace, and log. Codex parallelism needs separate care
 because ChatGPT OAuth refresh tokens can race when multiple jobs share one auth volume; see

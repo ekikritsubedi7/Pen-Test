@@ -37,11 +37,11 @@ image: the image is the tool; the benchmark drives it from the host or a dedicat
 - ✅ **Phase 4 — Docker-network benchmark execution.** A 10-target xbow baseline completed with the tool
   container joined to each target's Docker network and attacking the target container IP directly.
   Results: `benchmark/pilot/DOCKER_REPORT.md` and `benchmark/pilot/docker_results.jsonl`.
-- ◐ **Phase 5 — reusable benchmark command.** The Docker-network baseline is complete, but the operational
-  harness is not yet committed as a reusable `make docker-bench`/script. The next runner should include
-  a conservative `--jobs`/`JOBS` knob: local probes confirmed 2-way and 4-way tool-container scheduling
-  works, but real Codex concurrency still needs token-refresh isolation. Productizing that runner and
-  expanding to the full 59-target medium/hard sweep remain open.
+- ◐ **Phase 5 — reusable benchmark command.** The reusable runner is now committed as
+  `benchmark/pilot/run_docker_bench.py` and supports `single`, `pipeline`, and `framework` variants.
+  A Makefile wrapper and full 59-target medium/hard sweep remain open. Keep a conservative
+  `--concurrency`/`JOBS` knob: local probes confirmed 2-way and 4-way tool-container scheduling works,
+  but real Codex concurrency still needs token-refresh isolation.
 - ◐ **Phase 6 — Docs/CI.** README, `CLAUDE.md`, benchmark docs, and this plan are being kept in sync.
   A gated login-persistence CI test and broader Makefile lint/typecheck coverage remain open.
 
@@ -58,7 +58,7 @@ image: the image is the tool; the benchmark drives it from the host or a dedicat
 | Auth — **Claude** | macOS host → **Keychain** (not a portable file). Linux container → `~/.claude/.credentials.json` (file). `claude setup-token` issues a long-lived token via **code-paste** (no localhost callback). | First login must happen **inside** the container (mac creds can't be copied); then persisted by `claude-config`. |
 | Auth — **Codex** | Container performs its own `codex login`; the `localhost:1455` OAuth callback is forwarded into the container via `socat`; session persists in the `pentestgpt-codex` volume. | API-key fallback is documented but not part of the default Make flow. |
 | Backend wiring | `pentestgpt --backend {claude,codex}` already implemented (`pentestgpt/core/backend.py`). | — |
-| Benchmark harness | Host-loopback harness remains in `benchmark/pilot/run_pilot.py`; Docker-network baseline results are committed in `DOCKER_REPORT.md`/`docker_results.jsonl`. | Commit/reuse the Docker-network runner as an in-repo command and scale beyond the 10-target baseline. |
+| Benchmark harness | Host-loopback harness remains in `benchmark/pilot/run_pilot.py`; reusable Docker-network runner is `benchmark/pilot/run_docker_bench.py`; baseline/comparison results are committed in `DOCKER_REPORT.md`, `DOCKER_COMPARISON.md`, and JSONL files. | Add a Makefile wrapper and scale beyond the 10-target baseline. |
 
 **Design driver:** the only genuinely hard problem is **persisting two independent login sessions**.
 Everything else is packaging. The two auth systems behave differently, so they get different (but
@@ -74,7 +74,7 @@ symmetric) handling, both ending in a **named volume** so login survives contain
 | `make docker-login` leaves both Claude and Codex authenticated in persistent volumes; later containers need no login. | Done and live-verified with `make docker-auth-status`. |
 | `make docker-run TARGET=... BACKEND=... MODEL=... MODE=...` runs the pipeline from the container. | Done. |
 | Docker-network benchmark execution avoids host-loopback target URLs. | Done for the 10-target baseline in `DOCKER_REPORT.md`. |
-| `make docker-bench` runs the multi-model benchmark harness end-to-end and produces a report. | Open: the operational Docker harness worked but is not yet committed/productized; the productized runner should support `JOBS=1/2/4` with isolated per-job containers. |
+| `make docker-bench` runs the multi-model benchmark harness end-to-end and produces a report. | Partially done: `benchmark/pilot/run_docker_bench.py` is committed and produces JSONL + `DOCKER_COMPARISON.md`; Makefile wrapper remains open. |
 | A gated login-persistence test proves auth survives down/recreate. | Open: manual/live verification exists; CI test remains. |
 | Full 59-target medium/hard xbow sweep. | Open. Current Docker baseline is 10 targets. |
 
@@ -289,8 +289,8 @@ The container must exercise *different settings with different pipelines*:
 
 A `make docker-test-matrix` runs a *small* representative sweep (e.g. 1 easy xbow challenge × the four
 model combos in CTF mode, plus one `pentestgpt_agent` framework smoke) to prove every pipeline path
-works in-container before any large benchmark run. The full benchmark sweep reuses
-`benchmark/pilot/run_pilot.py` (already resumable + parametrized).
+works in-container before any large benchmark run. The full Docker-network sweep should reuse
+`benchmark/pilot/run_docker_bench.py` (already resumable + parametrized).
 
 ---
 
@@ -308,9 +308,10 @@ works in-container before any large benchmark run. The full benchmark sweep reus
   results written to host.
 - **Phase 4 — Docker-network target access.** ✔ 10-target xbow baseline completed with the tool
   container on the target Docker network and target URLs set to container IPs.
-- **Phase 5 — Benchmark + matrix.** ◐ `DOCKER_REPORT.md` generated for 10 targets × 4 combos. Open:
-  commit/productize the Docker-network harness as `make docker-bench` with `JOBS`, add
-  `make docker-test-matrix`, and run the full 59-target medium/hard sweep.
+- **Phase 5 — Benchmark + matrix.** ◐ `DOCKER_REPORT.md` generated for 10 targets × 4 combos;
+  `run_docker_bench.py` now supports Docker-network `single`, `pipeline`, and `framework` variants.
+  Open: add `make docker-bench`/`make docker-test-matrix` wrappers and run the full 59-target
+  medium/hard sweep.
 - **Phase 6 — Docs/CI.** ◐ Docs updated with the Docker baseline. Open: add a gated
   login-persistence test and broaden Makefile lint/typecheck coverage for `unified_agent/` and
   `pentestgpt_agent/`.

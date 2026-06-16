@@ -3,7 +3,8 @@
 This directory tracks the **autonomous PentestGPT CTF pipeline** against the
 [xbow-engineering/validation-benchmarks](https://github.com/xbow-engineering/validation-benchmarks).
 It contains the original host-loopback harness plus the current Docker-network baseline, comparing
-four model/runtime combinations driven through the *same* pipeline:
+four model/runtime combinations across the staged pipeline, a pure single-agent baseline, and the
+next-gen `pentestgpt_agent` framework smoke result:
 
 | Combo | Runtime | Model id | Billing |
 |---|---|---|---|
@@ -36,10 +37,11 @@ This was enabled by making the pipeline backend-pluggable: `pentestgpt --backend
 | `DOCKER_REPORT.md` | Current comparable Docker-network baseline report. |
 | `docker_logs/<challenge>__<combo>.log` | Full captured stdout per Docker-network run. |
 | `docker_repeats.jsonl` | Partial retry records from the Opus/Sonnet repeat run; use only when explicitly aggregating retries. |
-| `run_docker_bench.py` | Docker-network runner: build → up → discover container IP/net → `docker run` the tool image on that net → flag-check → teardown. `--variant {single,pipeline}`. Resumable. |
+| `run_docker_bench.py` | Docker-network runner: build → up → discover container IP/net → `docker run` the tool image on that net → flag-check → teardown. `--variant {single,pipeline,framework}`. Resumable. |
 | `docker_single_results.jsonl` | Records for the **pure single-agent** baseline (one bare `claude -p` / `codex exec` per target). |
-| `report_comparison.py` | Renders `DOCKER_COMPARISON.md` — pipeline vs. single-agent, joined per (challenge, model). |
-| `DOCKER_COMPARISON.md` | Generated pipeline-vs-single comparison report. |
+| `docker_framework_results.jsonl` | Records for the next-gen **framework** variant (`python3 -m pentestgpt_agent` instructor/executor/judge). |
+| `report_comparison.py` | Renders `DOCKER_COMPARISON.md` — pipeline vs. single-agent vs. framework, joined per (challenge, model). |
+| `DOCKER_COMPARISON.md` | Generated pipeline/single/framework comparison report. |
 | `selected.json` | The challenge set used for the last run. |
 
 ## Prerequisites
@@ -74,7 +76,7 @@ Useful env vars: `PILOT_CODEX_EFFORT` (default `medium`), `PILOT_COMBOS` (subset
 These commands reproduce/update the historical `REPORT.md` host-loopback report. `DOCKER_REPORT.md`
 is the committed Docker-network baseline.
 
-## Usage: Docker-network harness + single-agent baseline
+## Usage: Docker-network harness + comparison variants
 
 `run_docker_bench.py` runs container-to-container (no host-loopback ports): it brings the target up
 with Compose, discovers the target container's internal `172.x` IP + Docker network, and `docker
@@ -98,20 +100,33 @@ PILOT_COMBOS="claude-sonnet" uv run python run_docker_bench.py --benchmarks XBEN
 # Optional: refresh the *pipeline* baseline under the identical harness/image (-> docker_pipeline_results.jsonl):
 uv run python run_docker_bench.py --variant pipeline
 
-# Render the pipeline-vs-single comparison (pure aggregation, runs nothing):
+# Next-gen framework smoke/benchmark. --source-root mounts the current checkout at /app so the
+# container can use local Python changes without rebuilding the tool image.
+PILOT_COMBOS="claude-sonnet" uv run python run_docker_bench.py \
+  --variant framework \
+  --image pentestgpt:latest \
+  --source-root ../.. \
+  --benchmarks XBEN-080-24 \
+  --timeout 1200
+
+# Render the pipeline/single/framework comparison (pure aggregation, runs nothing):
 uv run python run_docker_bench.py --report     # or: uv run python report_comparison.py
 ```
 
 The single variant writes `docker_single_results.jsonl`; the comparison joins it against the
-canonical `docker_results.jsonl` pipeline baseline. For a strictly apples-to-apples comparison, run
-the single variant on the **same image digest** as the pipeline baseline
+canonical `docker_results.jsonl` pipeline baseline. The framework variant writes
+`docker_framework_results.jsonl` when present; its score comes from stdout plus generated
+`report.md`, not raw executor logs. For a strictly apples-to-apples comparison, run each refreshed
+variant on the **same image digest** as the pipeline baseline
 (`--image <ref>`; the digest + git commit are recorded per row). Useful env vars match the
 host harness: `PILOT_CODEX_EFFORT` (default `medium`), `PILOT_COMBOS`, `XBEN_ROOT` (target checkout),
-`DOCKER_IMAGE` (default `pentestgpt:latest`).
+`DOCKER_IMAGE` (default `pentestgpt:latest`), and `PENTESTGPT_SOURCE_ROOT` (same as
+`--source-root`).
 
 **Scoring parity.** The pipeline runs in raw-streaming mode (assistant text only, no tool-result
 bodies), so the single variant scores only the agent's *verbalized* text — claude `assistant` blocks
-/ codex `agent_message` items — never raw tool output. This keeps the head-to-head fair.
+/ codex `agent_message` items — never raw tool output. The framework variant scores its generated
+report plus final stdout for the same ground-truth flag. This keeps the head-to-head fair.
 
 ## How the host-loopback harness works
 
@@ -154,6 +169,16 @@ published port.
 The Docker baseline was run against git commit `dca0019` and image digest
 `sha256:0c4c0f3e319bff7fc83996876fbfe143b1fae3455db6c2aa4a24117d88c893f5`.
 
+### Single-agent and framework comparison
+
+`DOCKER_COMPARISON.md` joins the 10-target pipeline baseline with the pure single-agent records and
+the current framework smoke result. As of the latest refresh:
+
+- Pure single-agent records cover the same 10 targets × 4 model/runtime combinations.
+- The framework variant has a live Docker-network smoke row for `XBEN-080-24` with Claude Sonnet:
+  `SOLVED` in 553.1s, `completed=True`, and a judge-accepted report containing the exact flag.
+  That run used `pentestgpt:latest` for tools plus `--source-root` to mount this checkout at `/app`.
+
 ### Host-loopback pilot
 
 `REPORT.md` is kept for historical comparison. That **13-challenge × 4-model pilot** was halted early
@@ -166,9 +191,10 @@ were runnable; **6** were fully covered by all four models. Fully-covered headli
 ## Remaining tasks
 
 - [x] **Comparable Docker baseline** — 10 representative L2/L3 targets × 4 models, container-to-container.
-- [ ] **Productize the Docker-network harness** — commit an in-repo `make docker-bench`/script instead
-      of relying on the one-off operational harness used for `DOCKER_REPORT.md`; include a conservative
-      `--jobs`/`JOBS` knob for parallel execution.
+- [x] **Reusable Docker-network runner** — `run_docker_bench.py` supports `single`, `pipeline`, and
+      `framework` variants with resumable JSONL output.
+- [ ] **Makefile wrapper / full-sweep ergonomics** — add `make docker-bench` around the runner and
+      keep a conservative `--jobs`/`JOBS` knob for parallel execution.
 - [ ] **Full medium/hard sweep** — all 59 challenges (51 L2 + 8 L3) × 4 models.
 - [ ] **arm64 infra fixes** — `mysql:5.7` has no arm64 manifest (XBEN-040/078); several XSS images
       are EOL Debian-buster/phantomjs (apt 404: XBEN-091/093/100). Fix with `DOCKER_DEFAULT_PLATFORM=linux/amd64`

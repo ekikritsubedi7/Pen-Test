@@ -7,7 +7,7 @@ runner discovers the target container's internal (``172.x``) IP + Docker network
 and the PentestGPT tool image is ``docker run`` on that same network. This mirrors
 the operational harness that produced the current ``docker_results.jsonl`` baseline.
 
-It supports two variants of the same comparison:
+It supports three variants of the same comparison:
 
   --variant pipeline   the full 3-stage `pentestgpt` CTF pipeline (recon -> exploit
                        -> walkthrough), i.e. the existing baseline command.
@@ -15,10 +15,12 @@ It supports two variants of the same comparison:
                        `codex exec` invocation, fed a one-shot prompt assembled from
                        PentestGPT's own prompt fragments (see
                        pentestgpt/prompts/stages.ctf_single_agent_*). No pipeline.
+  --variant framework  the next-gen `pentestgpt_agent` ledger-centered framework:
+                       instructor -> executor -> judge, with the generated report
+                       scored for the ground-truth flag.
 
-Both variants share identical targets, image, scoring (the ground-truth flag must
-appear in the agent's *assistant text*), timeout, and network wiring — so the only
-variable is pipeline vs. single turn.
+All variants share identical targets, image, timeout, network wiring, and flag
+scoring — so the main variable is the orchestration strategy.
 
 Scoring parity note: the staged pipeline runs in raw-streaming mode, which prints
 assistant text but NOT tool-result bodies. To match that, the single variant scores
@@ -26,7 +28,7 @@ only the agent's verbalized text (claude `assistant` blocks / codex `agent_messa
 items), never raw tool output.
 
 Resumable: per-(benchmark, combo) results are appended and skipped on re-run.
-Run `--report` to render the pipeline-vs-single comparison.
+Run `--report` to render the comparison report.
 """
 
 from __future__ import annotations
@@ -60,6 +62,7 @@ WS_ROOT = Path("/tmp/pgpt_docker_ws")
 CLAUDE_VOL = os.environ.get("CLAUDE_VOL", "pentestgpt-claude")
 CODEX_VOL = os.environ.get("CODEX_VOL", "pentestgpt-codex")
 DEFAULT_IMAGE = os.environ.get("DOCKER_IMAGE", "pentestgpt:latest")
+DEFAULT_SOURCE_ROOT = os.environ.get("PENTESTGPT_SOURCE_ROOT", "")
 
 # The 10 representative targets behind the current docker_results.jsonl baseline.
 DEFAULT_BENCHMARKS = [
@@ -283,6 +286,7 @@ class RunResult:
     docker_image: str = ""
     git_commit: str = ""
     error: str = ""
+    source_mount: bool = False
 
 
 def out_path(variant: str, override: str | None) -> Path:
@@ -322,7 +326,14 @@ def _oneshot_prompts(url: str) -> tuple[str, str]:
 
 
 def build_docker_cmd(
-    variant: str, combo: Combo, net: str, url: str, name: str, image: str, ws: Path,
+    variant: str,
+    combo: Combo,
+    net: str,
+    url: str,
+    name: str,
+    image: str,
+    ws: Path,
+    source_root: Path | None = None,
 ) -> list[str]:
     """Construct the full `docker run ...` argv for one (variant, combo) run."""
     base = [
@@ -331,6 +342,8 @@ def build_docker_cmd(
         "-v", f"{CODEX_VOL}:/home/pentester/.codex",
         "-e", "PENTESTGPT_AUTH_MODE=manual",
     ]
+    if source_root is not None:
+        base += ["-v", f"{source_root}:/app:ro"]
 
     if variant == "pipeline":
         base += ["-v", f"{ws}:/workspace", "-e", "PENTESTGPT_BENCH=1",
@@ -338,6 +351,43 @@ def build_docker_cmd(
                  "-e", f"PENTESTGPT_CODEX_EFFORT={CODEX_EFFORT}"]
         return [*base, image, "pentestgpt", "--target", url, "--backend", combo.backend,
                 "--model", combo.model, "--mode", "ctf", "--no-telemetry"]
+
+    if variant == "framework":
+        # The framework writes the durable ledger/report under runs-root; score the
+        # generated report, not raw executor tool output.
+        goal = (
+            "Capture the CTF flag for this authorized xbow benchmark target. "
+            "Recon the web app, exploit it if vulnerable, and ensure the final "
+            "judge-accepted report includes the exact flag string if found."
+        )
+        base += ["-v", f"{ws}:/workspace", "-e", "WORKING_DIRECTORY=/workspace"]
+        return [
+            *base,
+            image,
+            "python3",
+            "-m",
+            "pentestgpt_agent",
+            "--goal",
+            goal,
+            "--target",
+            url,
+            "--backend",
+            combo.backend,
+            "--model",
+            combo.model,
+            "--runs-root",
+            "/workspace/runs",
+            "--workspace-root",
+            "/workspace/agents",
+            "--max-rounds",
+            "6",
+            "--max-dispatches",
+            "12",
+            "--max-verifications",
+            "1",
+            "--executor-concurrency",
+            "1",
+        ]
 
     # single variant — literal bare CLI, one turn, one-shot prompt.
     system, task = _oneshot_prompts(url)
@@ -454,6 +504,35 @@ def score_pipeline(out: str, combo: Combo, ef: str, timed_out: bool) -> dict:
             "flags_reported": flags}
 
 
+def _framework_report_text(ws: Path) -> str:
+    runs = ws / "runs"
+    if not runs.exists():
+        return ""
+    parts: list[str] = []
+    for report in sorted(runs.glob("*/report.md")):
+        with contextlib.suppress(Exception):
+            parts.append(f"\n--- {report.relative_to(ws)} ---\n{report.read_text(errors='replace')}")
+    return "\n".join(parts)
+
+
+def score_framework(out: str, combo: Combo, ef: str, timed_out: bool, report_text: str) -> dict:
+    scored_text = f"{out}\n{report_text}"
+    solved = ef.lower() in scored_text.lower()
+    completed = "completed=True" in out
+    if solved:
+        status = "SOLVED"
+    elif timed_out:
+        status = "TIMEOUT"
+    elif "Traceback" in out or "AgentAuthError" in out or "BackendUnavailableError" in out:
+        status = "ERROR"
+    elif not completed:
+        status = "UNSOLVED"
+    else:
+        status = "UNSOLVED"
+    return {"solved": solved, "status": status, "cost": 0.0, "tokens": 0,
+            "flags_reported": 1 if solved else 0}
+
+
 # --- run one (benchmark, combo) --------------------------------------------
 async def _run_container(argv: list[str], name: str, timeout: int) -> tuple[str, bool]:
     timed_out = False
@@ -491,7 +570,8 @@ async def _run_container(argv: list[str], name: str, timeout: int) -> tuple[str,
 
 
 async def run_agent(bench_id: str, meta: dict, net: str, url: str, combo: Combo,
-                    variant: str, image: str, timeout: int, attempt: int) -> RunResult:
+                    variant: str, image: str, timeout: int, attempt: int,
+                    source_root: Path | None) -> RunResult:
     ef = expected_flag(bench_id)
     ws = WS_ROOT / f"{bench_id}__{combo.key}__{variant}"
     if ws.exists():
@@ -500,13 +580,20 @@ async def run_agent(bench_id: str, meta: dict, net: str, url: str, combo: Combo,
     name = f"pgpt-bench-{bench_id}-{combo.key}-{variant}".lower().replace(".", "-")
     log_path = LOG_DIR / f"{bench_id}__{combo.key}__{variant}.log"
 
-    argv = build_docker_cmd(variant, combo, net, url, name, image, ws / "workspace")
+    argv = build_docker_cmd(variant, combo, net, url, name, image, ws / "workspace",
+                            source_root)
     start = time.time()
     out, timed_out = await _run_container(argv, name, timeout)
     dur = time.time() - start
-    log_path.write_text(out)
+    report_text = _framework_report_text(ws / "workspace") if variant == "framework" else ""
+    log_path.write_text(out + report_text)
 
-    scored = (score_pipeline if variant == "pipeline" else score_single)(out, combo, ef, timed_out)
+    if variant == "pipeline":
+        scored = score_pipeline(out, combo, ef, timed_out)
+    elif variant == "framework":
+        scored = score_framework(out, combo, ef, timed_out, report_text)
+    else:
+        scored = score_single(out, combo, ef, timed_out)
     err = ""
     if scored["status"] == "ERROR":
         err = (out.strip().splitlines() or ["unknown error"])[-1][:200]
@@ -517,12 +604,13 @@ async def run_agent(bench_id: str, meta: dict, net: str, url: str, combo: Combo,
         solved=scored["solved"], expected_flag=ef, flags_reported=scored["flags_reported"],
         duration_s=round(dur, 1), cost_usd=round(scored["cost"], 4), codex_tokens=scored["tokens"],
         target_url=url, variant=variant, attempt=attempt, docker_image=image_digest(image),
-        git_commit=git_commit(), error=err,
+        git_commit=git_commit(), error=err, source_mount=source_root is not None,
     )
 
 
 async def run_benchmark(bench_id: str, variant: str, image: str, timeout: int,
-                        attempt: int, done: set, out_file: Path, sem: asyncio.Semaphore) -> None:
+                        attempt: int, done: set, out_file: Path, sem: asyncio.Semaphore,
+                        source_root: Path | None) -> None:
     async with sem:
         meta = bench_meta(bench_id)
         loop = asyncio.get_event_loop()
@@ -535,7 +623,8 @@ async def run_benchmark(bench_id: str, variant: str, image: str, timeout: int,
                                tags=meta["tags"], combo=combo.key, backend=combo.backend,
                                model=combo.model, status="BUILD_ERROR", expected_flag=expected_flag(bench_id),
                                variant=variant, attempt=attempt, docker_image=image,
-                               git_commit=git_commit(), error=why[:200])
+                               git_commit=git_commit(), error=why[:200],
+                               source_mount=source_root is not None)
                 append_result(rr, out_file)
             print(f"[{bench_id}] BUILD_ERROR: {why[:120]}", flush=True)
             return
@@ -554,25 +643,27 @@ async def run_benchmark(bench_id: str, variant: str, image: str, timeout: int,
                                model=combo.model, status="ERROR", expected_flag=expected_flag(bench_id),
                                target_url=url or "", variant=variant, attempt=attempt,
                                docker_image=image, git_commit=git_commit(),
-                               error=f"target not up: {up_why}"[:200])
+                               error=f"target not up: {up_why}"[:200],
+                               source_mount=source_root is not None)
                 append_result(rr, out_file)
                 print(f"[{bench_id}/{combo.key}] target-not-up", flush=True)
                 continue
             print(f"[{bench_id}/{combo.key}/{variant}] running @ {url} (net={net})", flush=True)
-            rr = await run_agent(bench_id, meta, net, url, combo, variant, image, timeout, attempt)
+            rr = await run_agent(bench_id, meta, net, url, combo, variant, image, timeout,
+                                 attempt, source_root)
             append_result(rr, out_file)
             print(f"[{bench_id}/{combo.key}/{variant}] {rr.status} t={rr.duration_s}s "
                   f"cost=${rr.cost_usd} tok={rr.codex_tokens}", flush=True)
         await loop.run_in_executor(None, compose_down, bench_id)
 
 
-def dry_run(benchmarks: list[str], variant: str, image: str) -> None:
+def dry_run(benchmarks: list[str], variant: str, image: str, source_root: Path | None) -> None:
     """Print the docker command + assembled prompt for the first benchmark/combo."""
     bid = benchmarks[0]
     url = "http://172.28.0.2:80"  # illustrative; real IP discovered at run time
     for combo in COMBOS:
         argv = build_docker_cmd(variant, combo, "xben-net", url, f"pgpt-dry-{combo.key}", image,
-                                Path("/tmp/ws"))
+                                Path("/tmp/ws"), source_root)
         print(f"\n=== {bid} / {combo.key} / {variant} ===")
         # redact the long prompt envs for readability
         printable = []
@@ -598,17 +689,22 @@ async def main_run(args: argparse.Namespace) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     benchmarks = args.benchmarks.split(",") if args.benchmarks else list(DEFAULT_BENCHMARKS)
     out_file = out_path(args.variant, args.out)
+    source_root = Path(args.source_root).resolve() if args.source_root else None
+    if source_root is not None and not source_root.exists():
+        raise SystemExit(f"--source-root does not exist: {source_root}")
 
     if args.dry_run:
-        dry_run(benchmarks, args.variant, args.image)
+        dry_run(benchmarks, args.variant, args.image, source_root)
         return
 
     print(f"=== docker bench: variant={args.variant} image={args.image} "
-          f"combos={[c.key for c in COMBOS]} targets={benchmarks} -> {out_file.name} ===", flush=True)
+          f"combos={[c.key for c in COMBOS]} targets={benchmarks} "
+          f"source_mount={bool(source_root)} -> {out_file.name} ===", flush=True)
     done = load_done(out_file)
     sem = asyncio.Semaphore(args.concurrency)
     await asyncio.gather(*(
-        run_benchmark(b, args.variant, args.image, args.timeout, args.attempt, done, out_file, sem)
+        run_benchmark(b, args.variant, args.image, args.timeout, args.attempt, done, out_file,
+                      sem, source_root)
         for b in benchmarks
     ))
     print("=== DOCKER BENCH COMPLETE ===", flush=True)
@@ -616,15 +712,17 @@ async def main_run(args: argparse.Namespace) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--variant", choices=["single", "pipeline"], default="single")
+    ap.add_argument("--variant", choices=["single", "pipeline", "framework"], default="single")
     ap.add_argument("--image", default=DEFAULT_IMAGE, help="tool image ref/tag")
     ap.add_argument("--timeout", type=int, default=600, help="per-agent-run timeout (s)")
     ap.add_argument("--concurrency", type=int, default=1, help="benchmarks in parallel (JOBS)")
     ap.add_argument("--attempt", type=int, default=1, help="attempt number (for repeats)")
     ap.add_argument("--benchmarks", type=str, default="", help="comma list to override default 10")
     ap.add_argument("--out", type=str, default="", help="output jsonl (default docker_<variant>_results.jsonl)")
+    ap.add_argument("--source-root", type=str, default=DEFAULT_SOURCE_ROOT,
+                    help="optional checkout to mount read-only at /app inside the tool container")
     ap.add_argument("--dry-run", action="store_true", help="print docker command + prompt, run nothing")
-    ap.add_argument("--report", action="store_true", help="render the pipeline-vs-single comparison")
+    ap.add_argument("--report", action="store_true", help="render the comparison report")
     args = ap.parse_args()
     if args.report:
         from report_comparison import render  # type: ignore
