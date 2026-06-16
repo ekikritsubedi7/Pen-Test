@@ -117,8 +117,9 @@ The single variant writes `docker_single_results.jsonl`; the comparison joins it
 canonical `docker_results.jsonl` pipeline baseline. The framework variant writes
 `docker_framework_results.jsonl` by default and can also append to `docker_repeats.jsonl` via
 `--out docker_repeats.jsonl`; its score comes from stdout plus generated
-`report.md`, not raw executor logs. Re-run a benchmark pass with a new `--attempt N`; repeat rows
-are appended, and `DOCKER_COMPARISON.md` uses the latest row for each challenge/model/variant.
+`report.md` and judge-accepted `ledger.json` findings, not raw executor logs. Re-run a benchmark
+pass with a new `--attempt N`; repeat rows are appended, and `DOCKER_COMPARISON.md` uses the
+latest row for each challenge/model/variant.
 For a strictly apples-to-apples comparison, run each refreshed variant on the **same image digest** as the pipeline baseline
 (`--image <ref>`; the digest + git commit are recorded per row). Useful env vars match the
 host harness: `PILOT_CODEX_EFFORT` (default `medium`), `PILOT_COMBOS`, `XBEN_ROOT` (target checkout),

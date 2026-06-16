@@ -524,6 +524,24 @@ def _framework_report_text(ws: Path) -> str:
     for report in sorted(runs.glob("*/report.md")):
         with contextlib.suppress(Exception):
             parts.append(f"\n--- {report.relative_to(ws)} ---\n{report.read_text(errors='replace')}")
+    for ledger in sorted(runs.glob("*/ledger.json")):
+        with contextlib.suppress(Exception):
+            data = json.loads(ledger.read_text())
+            accepted = set(data.get("accepted_finding_ids") or [])
+            lines = [f"\n--- {ledger.relative_to(ws)} accepted findings ---"]
+            for finding in data.get("findings") or []:
+                if finding.get("id") not in accepted:
+                    continue
+                lines.extend(
+                    [
+                        f"Finding: {finding.get('id', '')} {finding.get('title', '')}",
+                        f"Target: {finding.get('affected_target', '')}",
+                        f"Description: {finding.get('description', '')}",
+                        f"Evidence: {finding.get('evidence_excerpt', '')}",
+                    ]
+                )
+            if len(lines) > 1:
+                parts.append("\n".join(lines))
     return "\n".join(parts)
 
 

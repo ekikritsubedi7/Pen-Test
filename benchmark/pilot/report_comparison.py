@@ -101,8 +101,8 @@ def render() -> None:
         "Does the 3-stage **PentestGPT pipeline** (recon → exploit → walkthrough) beat handing "
         "the same target to a **single, un-orchestrated agent**, or to the next-gen "
         "`pentestgpt_agent` **framework**? Variants use the same targets, Docker-network wiring, "
-        "timeout, and flag scoring. The framework score is based on stdout plus the generated "
-        "`report.md` with judge-reviewed findings, not raw executor logs.\n")
+        "timeout, and flag scoring. The framework score is based on stdout, generated "
+        "`report.md`, and judge-accepted ledger findings, not raw executor logs.\n")
 
     # --- headline: head-to-head solve rates ---
     out.append("## Headline — solve rate (head-to-head subsets)\n")
@@ -189,7 +189,8 @@ def render() -> None:
         "call, fed `ctf_single_agent_{system,task}_prompt` (the same fragments the pipeline uses, "
         "collapsed into one turn). No orchestration, no inter-stage context handoff.\n"
         "- **Framework**: `python3 -m pentestgpt_agent` — instructor/executor/judge with a durable "
-        "ledger. Scored from stdout plus generated `report.md`, not raw executor logs.\n"
+        "ledger. Scored from stdout, generated `report.md`, and judge-accepted ledger findings; "
+        "unaccepted raw executor logs do not count.\n"
         "- **Scoring**: the ground-truth flag `FLAG{sha256(UPPER-DIR)}` must appear in the agent's "
         "reported output (`assistant` text for pipeline/single; final report for framework), "
         "not raw tool output.\n"

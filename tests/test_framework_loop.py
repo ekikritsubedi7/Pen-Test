@@ -272,6 +272,19 @@ async def test_judge_acceptance_completes_the_run(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_completion_review_includes_accepted_finding_evidence(tmp_path: Path) -> None:
+    instructor = FakeAgent(seq([instr(tasks=(tcard("p", "probe"),)), instr(propose=True, summary="done")]))
+    executor = FakeAgent(always(evidence(findings=(cand(),))))
+    judge = FakeAgent(always(verdict("accept")))
+
+    await build(instructor, executor, judge, runs_root=tmp_path).run("goal")
+
+    completion_prompts = [str(call.task) for call in judge.calls if "COMPLETION REVIEW" in str(call.task)]
+    assert completion_prompts
+    assert "Evidence: MARKER" in completion_prompts[-1]
+
+
+@pytest.mark.asyncio
 async def test_rejected_finding_absent_from_report(tmp_path: Path) -> None:
     instructor = FakeAgent(seq([instr(tasks=(tcard("p", "probe"),)), instr(propose=True)]))
     executor = FakeAgent(by_text([("probe", evidence(findings=(cand(title="Bogus"),)))], default=evidence()))
