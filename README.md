@@ -257,7 +257,12 @@ directly. Raw records are in
 The earlier host-loopback pilot remains in [`benchmark/pilot/REPORT.md`](benchmark/pilot/REPORT.md)
 for historical comparison. Remaining benchmark work is the full 59-target medium/hard sweep,
 productizing the Docker-network harness as an in-repo command, retries/best-of-k, and cost
-normalization.
+normalization. The productized Docker runner should expose a conservative `JOBS`/`--jobs` setting:
+start with `2`, move to `4` only after a small matrix is clean, and keep each benchmark job in its own
+tool container with a unique target stack, workspace, and log. Codex parallelism needs separate care
+because ChatGPT OAuth refresh tokens can race when multiple jobs share one auth volume; see
+[`benchmark/pilot/README.md`](benchmark/pilot/README.md) and
+[`docs/docker-dev-plan.md`](docs/docker-dev-plan.md).
 
 ---
 

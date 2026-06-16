@@ -32,9 +32,14 @@ This was enabled by making the pipeline backend-pluggable: `pentestgpt --backend
 | `results.jsonl` | One JSON record per `(challenge, model)` run. Source of truth; re-run skips completed pairs. |
 | `logs/<challenge>__<combo>.log` | Full captured stdout per run. |
 | `REPORT.md` | Generated report for the older host-loopback pilot. |
-| `docker_results.jsonl` | Source-of-truth records for the completed Docker-network baseline. |
+| `docker_results.jsonl` | Source-of-truth records for the completed Docker-network **pipeline** baseline. |
 | `DOCKER_REPORT.md` | Current comparable Docker-network baseline report. |
 | `docker_logs/<challenge>__<combo>.log` | Full captured stdout per Docker-network run. |
+| `docker_repeats.jsonl` | Partial retry records from the Opus/Sonnet repeat run; use only when explicitly aggregating retries. |
+| `run_docker_bench.py` | Docker-network runner: build → up → discover container IP/net → `docker run` the tool image on that net → flag-check → teardown. `--variant {single,pipeline}`. Resumable. |
+| `docker_single_results.jsonl` | Records for the **pure single-agent** baseline (one bare `claude -p` / `codex exec` per target). |
+| `report_comparison.py` | Renders `DOCKER_COMPARISON.md` — pipeline vs. single-agent, joined per (challenge, model). |
+| `DOCKER_COMPARISON.md` | Generated pipeline-vs-single comparison report. |
 | `selected.json` | The challenge set used for the last run. |
 
 ## Prerequisites
@@ -67,8 +72,46 @@ Useful env vars: `PILOT_CODEX_EFFORT` (default `medium`), `PILOT_COMBOS` (subset
 `DOCKER_DEFAULT_PLATFORM=linux/amd64` (force amd64 emulation for arm64-incompatible images).
 
 These commands reproduce/update the historical `REPORT.md` host-loopback report. `DOCKER_REPORT.md`
-is the committed Docker-network baseline; productizing its runner/renderer into this directory is
-listed under remaining tasks.
+is the committed Docker-network baseline.
+
+## Usage: Docker-network harness + single-agent baseline
+
+`run_docker_bench.py` runs container-to-container (no host-loopback ports): it brings the target up
+with Compose, discovers the target container's internal `172.x` IP + Docker network, and `docker
+run`s the tool image on that same network. It builds the image-side auth from the persisted volumes
+(`pentestgpt-claude` / `pentestgpt-codex`), so run `make docker-build` + `make docker-login` first.
+
+```bash
+cd benchmark/pilot
+
+# "Pure single agent" baseline — ONE bare `claude -p` / `codex exec` per target, fed a one-shot
+# prompt built from PentestGPT's own fragments (pentestgpt/prompts/stages.ctf_single_agent_*).
+uv run python run_docker_bench.py --variant single            # default: the 10 baseline targets
+uv run python run_docker_bench.py --variant single --benchmarks XBEN-068-24,XBEN-079-24
+
+# Inspect the exact docker command + assembled prompt without running anything:
+uv run python run_docker_bench.py --variant single --benchmarks XBEN-068-24 --dry-run
+
+# Smoke one combo:
+PILOT_COMBOS="claude-sonnet" uv run python run_docker_bench.py --benchmarks XBEN-068-24
+
+# Optional: refresh the *pipeline* baseline under the identical harness/image (-> docker_pipeline_results.jsonl):
+uv run python run_docker_bench.py --variant pipeline
+
+# Render the pipeline-vs-single comparison (pure aggregation, runs nothing):
+uv run python run_docker_bench.py --report     # or: uv run python report_comparison.py
+```
+
+The single variant writes `docker_single_results.jsonl`; the comparison joins it against the
+canonical `docker_results.jsonl` pipeline baseline. For a strictly apples-to-apples comparison, run
+the single variant on the **same image digest** as the pipeline baseline
+(`--image <ref>`; the digest + git commit are recorded per row). Useful env vars match the
+host harness: `PILOT_CODEX_EFFORT` (default `medium`), `PILOT_COMBOS`, `XBEN_ROOT` (target checkout),
+`DOCKER_IMAGE` (default `pentestgpt:latest`).
+
+**Scoring parity.** The pipeline runs in raw-streaming mode (assistant text only, no tool-result
+bodies), so the single variant scores only the agent's *verbalized* text — claude `assistant` blocks
+/ codex `agent_message` items — never raw tool output. This keeps the head-to-head fair.
 
 ## How the host-loopback harness works
 
@@ -124,7 +167,8 @@ were runnable; **6** were fully covered by all four models. Fully-covered headli
 
 - [x] **Comparable Docker baseline** — 10 representative L2/L3 targets × 4 models, container-to-container.
 - [ ] **Productize the Docker-network harness** — commit an in-repo `make docker-bench`/script instead
-      of relying on the one-off operational harness used for `DOCKER_REPORT.md`.
+      of relying on the one-off operational harness used for `DOCKER_REPORT.md`; include a conservative
+      `--jobs`/`JOBS` knob for parallel execution.
 - [ ] **Full medium/hard sweep** — all 59 challenges (51 L2 + 8 L3) × 4 models.
 - [ ] **arm64 infra fixes** — `mysql:5.7` has no arm64 manifest (XBEN-040/078); several XSS images
       are EOL Debian-buster/phantomjs (apt 404: XBEN-091/093/100). Fix with `DOCKER_DEFAULT_PLATFORM=linux/amd64`
@@ -191,6 +235,38 @@ traffic was container-to-container. The reusable in-repo command is still open w
   and friends build/run everywhere; bump per-run timeout to absorb emulation slowdown.
 - **Persistence** — keep `benchmark/pilot/*results.jsonl`, reports, and logs on the host so results
   survive and the run stays resumable.
+
+### Parallel execution policy
+
+The benchmark runner should parallelize at the **job/container** level, not by packing several real
+benchmark runs into one long-lived tool container. A job is one `(attempt, benchmark, combo)` run:
+bring up one fresh target stack, attach one fresh PentestGPT tool container, write one log/result row,
+then tear everything down.
+
+Required isolation per job:
+
+- Unique Docker Compose project name, e.g. `pgpt-a2-xben075-claude-sonnet`, so networks, containers,
+  and volumes do not collide.
+- Unique workspace path, e.g. `/tmp/pgpt_docker_bench_ws/attempt2__XBEN-075-24__claude-sonnet`.
+- Unique log path, and either a locked JSONL writer or one per-worker JSONL shard merged after the run.
+- Cleanup by project/container id, not by broad image or name prefixes except for explicit emergency
+  cleanup.
+
+Operational guidance:
+
+- Start the full runner at `--jobs 2`. Move to `--jobs 4` only after a small representative matrix is
+  clean. The current Docker host can schedule 2-way and 4-way lightweight tool-container probes, but
+  real model runs also contend on target CPU, memory, provider rate limits, and OAuth token refresh.
+- Keep one tool container per job even if several worker processes can technically run inside one
+  container. Separate containers make logs, workspaces, process trees, and teardown simpler.
+- Claude parallelism is lower risk because the persisted `setup-token` is read from the volume and
+  exported as `CLAUDE_CODE_OAUTH_TOKEN`.
+- Codex parallelism needs extra care. ChatGPT OAuth refresh tokens rotate, so concurrent writers to the
+  same `pentestgpt-codex` volume can race. For parallel Codex sweeps, prefer API-key auth, one Codex
+  auth volume per worker, or keep Codex jobs at concurrency 1 until a live round-trip stress test proves
+  shared-volume refresh is safe.
+- Make the runner resumable by keying completed rows on `(attempt, benchmark_id, combo)`. Missing rows
+  can then be filled without disturbing completed work.
 
 ### Why this satisfies the security constraint
 

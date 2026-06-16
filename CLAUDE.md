@@ -154,11 +154,24 @@ combos — Claude `opus`/`sonnet` and Codex `gpt-5.5`/`gpt-5.4-mini` — over th
   target container IP directly (`172.x`), not a host-loopback port. Baseline commit in the records:
   `dca0019`; image digest:
   `sha256:0c4c0f3e319bff7fc83996876fbfe143b1fae3455db6c2aa4a24117d88c893f5`.
+- **Single-agent baseline**: `run_docker_bench.py --variant single` measures a **pure single agent**
+  (one bare `claude -p` / `codex exec` per target, no pipeline) on the same targets, fed a one-shot
+  prompt collapsed from the pipeline's own fragments (`pentestgpt/prompts/stages.ctf_single_agent_*`).
+  It writes `docker_single_results.jsonl`; `report_comparison.py` renders `DOCKER_COMPARISON.md`
+  (pipeline vs. single, head-to-head per model). Same image/scoring/wiring as the pipeline baseline, so
+  the only variable is the multi-stage decomposition. Scoring stays fair by matching the parts only
+  (assistant text, never raw tool output). `run_docker_bench.py` is the in-repo Docker-network runner
+  (`--variant {single,pipeline}`): build → up → discover container IP/net → `docker run` on that net →
+  flag-check → teardown; resumable.
 - **Host pilot**: `run_pilot.py` + `report.py` + `REPORT.md` remain as the older loopback-published
   harness/report. It was halted after 47/52 runs because scans tripped host endpoint-security monitoring.
-- **Open benchmark work**: productize the Docker-network harness as an in-repo `make docker-bench` or
-  script, run the full 59-target medium/hard sweep, fix/document arm64 fixture issues, add retries, and
-  normalize cost accounting.
+- **Open benchmark work**: run the full 59-target medium/hard sweep, fix/document arm64 fixture issues,
+  add a `make docker-bench` wrapper + retries, and
+  normalize cost accounting. The runner should parallelize at the job/container level with
+  `JOBS=1/2/4`: one target stack, one tool container, one workspace, one log/result row per job. Start
+  real sweeps at `JOBS=2`; move to `JOBS=4` only after a small matrix is clean. Treat Codex parallelism
+  carefully because shared ChatGPT OAuth refresh tokens can race; prefer API-key auth, one Codex auth
+  volume per worker, or Codex concurrency 1 until stress-tested.
 
 > The benchmark fixtures are a **separate** checkout (an `xbow-validation-benchmarks` submodule, e.g.
 > at a sibling path), not vendored into this repo. The agents run real offensive tooling (nmap,

@@ -38,7 +38,9 @@ image: the image is the tool; the benchmark drives it from the host or a dedicat
   container joined to each target's Docker network and attacking the target container IP directly.
   Results: `benchmark/pilot/DOCKER_REPORT.md` and `benchmark/pilot/docker_results.jsonl`.
 - ◐ **Phase 5 — reusable benchmark command.** The Docker-network baseline is complete, but the operational
-  harness is not yet committed as a reusable `make docker-bench`/script. Productizing that runner and
+  harness is not yet committed as a reusable `make docker-bench`/script. The next runner should include
+  a conservative `--jobs`/`JOBS` knob: local probes confirmed 2-way and 4-way tool-container scheduling
+  works, but real Codex concurrency still needs token-refresh isolation. Productizing that runner and
   expanding to the full 59-target medium/hard sweep remain open.
 - ◐ **Phase 6 — Docs/CI.** README, `CLAUDE.md`, benchmark docs, and this plan are being kept in sync.
   A gated login-persistence CI test and broader Makefile lint/typecheck coverage remain open.
@@ -72,7 +74,7 @@ symmetric) handling, both ending in a **named volume** so login survives contain
 | `make docker-login` leaves both Claude and Codex authenticated in persistent volumes; later containers need no login. | Done and live-verified with `make docker-auth-status`. |
 | `make docker-run TARGET=... BACKEND=... MODEL=... MODE=...` runs the pipeline from the container. | Done. |
 | Docker-network benchmark execution avoids host-loopback target URLs. | Done for the 10-target baseline in `DOCKER_REPORT.md`. |
-| `make docker-bench` runs the multi-model benchmark harness end-to-end and produces a report. | Open: the operational Docker harness worked but is not yet committed/productized. |
+| `make docker-bench` runs the multi-model benchmark harness end-to-end and produces a report. | Open: the operational Docker harness worked but is not yet committed/productized; the productized runner should support `JOBS=1/2/4` with isolated per-job containers. |
 | A gated login-persistence test proves auth survives down/recreate. | Open: manual/live verification exists; CI test remains. |
 | Full 59-target medium/hard xbow sweep. | Open. Current Docker baseline is 10 targets. |
 
@@ -161,7 +163,31 @@ The image is the tool runtime, not the benchmark runner:
 
 ---
 
-## 5. Targets, networking & results
+## 5. Build/install speed
+
+The image build is already cache-friendly at the coarse layer level, but first-time setup can be
+faster and less fragile with a few simple Dockerfile changes:
+
+1. **Drop `apt-get upgrade`.** Base images should be refreshed by rebuilding from a newer base digest;
+   upgrading the whole distro during each build is slow and makes builds less reproducible.
+2. **Install all apt packages in one apt layer.** `socat` is currently installed in a late layer; move it
+   into the main apt install list unless there is a strong cache-invalidation reason to keep it late.
+3. **Combine global npm installs.** Install `@musistudio/claude-code-router` and `@openai/codex` in one
+   `npm install -g ...` invocation.
+4. **Use BuildKit cache mounts** for apt, npm, and uv:
+   `--mount=type=cache,target=/var/cache/apt`, `--mount=type=cache,target=/root/.npm`, and a uv cache
+   mount. This keeps repeat builds fast without baking caches into the final image.
+5. **Copy `uv.lock` before app source** and use a frozen dependency install path when possible. That
+   preserves the Python dependency layer across ordinary source edits.
+6. **Keep the benchmark harness outside the image.** Rebuilding the tool image should not depend on
+   changing benchmark logs, reports, target checkouts, or run artifacts.
+
+These are build-time optimizations only. They do not change the benchmark execution model or the
+persistent login volumes.
+
+---
+
+## 6. Targets, networking & results
 
 The agent must reach the xbow target but **not** trip host endpoint monitoring (the reason a prior host
 run was halted). Two modes matter:
@@ -182,7 +208,50 @@ host so runs are resumable and reviewable.
 
 ---
 
-## 6. UX — Make targets (mirror existing patterns)
+## 7. Parallel benchmark runner design
+
+Parallelism should be implemented at the **job/container** level. A job is one
+`(attempt, benchmark_id, combo)` run: create the target stack, run one tool container, write one
+result/log, and tear down. Avoid running several real benchmark jobs inside one long-lived tool
+container; separate containers make process isolation, logs, workspaces, and cleanup simpler.
+
+Required runner behavior:
+
+- `--jobs N` / `JOBS=N` with default `1`; use `2` as the first real parallel setting and only move to
+  `4` after a small representative matrix passes.
+- Unique Docker Compose project names per job so target networks and service names do not collide.
+- Unique workspace and log paths per job.
+- A locked JSONL writer or per-worker JSONL shards merged after completion.
+- Resumability keyed by `(attempt, benchmark_id, combo)` so interrupted runs fill only missing rows.
+- Cleanup by exact project/container id, with an explicit emergency cleanup command for stale
+  `pgpt-bench-*`/`xben-*` artifacts.
+
+Auth caveat:
+
+- Claude parallelism is low risk because the persisted setup token is read from
+  `pentestgpt-claude` and exported as `CLAUDE_CODE_OAUTH_TOKEN`.
+- Codex ChatGPT OAuth refresh tokens rotate. Concurrent Codex runs sharing one `pentestgpt-codex`
+  volume can race while refreshing. For Codex parallel sweeps, prefer API-key auth, one Codex auth
+  volume per worker, or keep Codex concurrency at 1 until a live round-trip stress test proves
+  shared-volume refresh is safe.
+
+Local scheduling probe, 2026-06-15:
+
+| Probe | Result |
+|---|---|
+| 2 separate tool containers | Completed in about the same wall time as one worker. |
+| 4 separate tool containers | Completed in about the same wall time as one worker. |
+| 2 worker processes inside one container | Completed concurrently. |
+| 4 worker processes inside one container | Completed concurrently. |
+| 4 containers sharing auth volumes, non-spending status check | Passed. |
+
+This proves Docker scheduling is not the blocker. It does **not** prove full 4-way model execution is
+safe; provider rate limits, target CPU/memory, and Codex token-refresh writes still need a real
+small-matrix test.
+
+---
+
+## 8. UX — Make targets (mirror existing patterns)
 
 ```
 make docker-build         # docker compose build (image with both CLIs + full solution)
@@ -197,7 +266,7 @@ make docker-nuke          # stop + remove volumes (forces re-login) — explicit
 Planned but not committed yet:
 
 ```
-make docker-bench BENCHES=XBEN-001-24,… COMBOS=… TIMEOUT=540
+make docker-bench BENCHES=XBEN-001-24,... COMBOS=... TIMEOUT=540 JOBS=2
 make docker-test-matrix
 ```
 
@@ -207,7 +276,7 @@ rather than hard-failing.
 
 ---
 
-## 7. Multi-pipeline / multi-setting test matrix
+## 9. Multi-pipeline / multi-setting test matrix
 
 The container must exercise *different settings with different pipelines*:
 
@@ -225,7 +294,7 @@ works in-container before any large benchmark run. The full benchmark sweep reus
 
 ---
 
-## 8. Implementation phases (with verification gates)
+## 10. Implementation phases (with verification gates)
 
 - **Phase 0 — Recon (done in this plan).** Auth layouts, login mechanisms, current Docker assets, gaps.
 - **Phase 1 — Image.** Extend `Dockerfile`: codex CLI + `openai_codex` + `unified_agent`/
@@ -240,8 +309,8 @@ works in-container before any large benchmark run. The full benchmark sweep reus
 - **Phase 4 — Docker-network target access.** ✔ 10-target xbow baseline completed with the tool
   container on the target Docker network and target URLs set to container IPs.
 - **Phase 5 — Benchmark + matrix.** ◐ `DOCKER_REPORT.md` generated for 10 targets × 4 combos. Open:
-  commit/productize the Docker-network harness as `make docker-bench`, add `make docker-test-matrix`,
-  and run the full 59-target medium/hard sweep.
+  commit/productize the Docker-network harness as `make docker-bench` with `JOBS`, add
+  `make docker-test-matrix`, and run the full 59-target medium/hard sweep.
 - **Phase 6 — Docs/CI.** ◐ Docs updated with the Docker baseline. Open: add a gated
   login-persistence test and broaden Makefile lint/typecheck coverage for `unified_agent/` and
   `pentestgpt_agent/`.
@@ -250,7 +319,7 @@ Each phase is independently verifiable; Phase 2 is the linchpin and is gated by 
 
 ---
 
-## 9. File-by-file change list
+## 11. File-by-file change list
 
 | File | Change |
 |---|---|
@@ -259,7 +328,7 @@ Each phase is independently verifiable; Phase 2 is the linchpin and is gated by 
 | `scripts/entrypoint.sh` | Implemented: persisted Claude token export and dual-auth status report; CCR/anthropic/manual modes kept. |
 | `scripts/docker-login.sh` | Implemented: idempotent Claude `setup-token` + separate in-container Codex login with final live verification. |
 | `scripts/docker-auth-status.sh` | Implemented: non-interactive auth status, optional `--roundtrip`. |
-| `Makefile` | Implemented: `docker-build/login/auth-status/shell/run/down/nuke`. Open: `docker-bench` and `docker-test-matrix`. |
+| `Makefile` | Implemented: `docker-build/login/auth-status/shell/run/down/nuke`. Open: `docker-bench JOBS=...` and `docker-test-matrix`. |
 | `.dockerignore` | Implemented: excludes credentials, env files, workspace, benchmark artifacts, and caches from image layers. |
 | `benchmark/pilot/run_pilot.py` | Host-loopback harness remains; Docker-network baseline was produced by an operational external harness. Open: move Docker-network mode into repo. |
 | `README.md` / `CLAUDE.md` / `benchmark/pilot/README.md` | Document Docker quickstart, current Docker baseline, and remaining benchmark work. |
@@ -267,7 +336,7 @@ Each phase is independently verifiable; Phase 2 is the linchpin and is gated by 
 
 ---
 
-## 10. Risks & mitigations
+## 12. Risks & mitigations
 
 | Risk | Mitigation |
 |---|---|
@@ -278,10 +347,12 @@ Each phase is independently verifiable; Phase 2 is the linchpin and is gated by 
 | Secret leakage into image/layers or git | `.dockerignore` excludes creds/env; volumes only; never `COPY` auth dirs; README warns volumes ≈ logged-in laptop. |
 | Docker-in-Docker complexity | Default to socket-mount (simpler); DinD documented as the stricter-isolation option. |
 | Scans still tripping monitoring in Mode B | Make **Mode A (internal network)** the recommended default; or run on a dedicated VM. |
+| Parallel Codex jobs racing on shared ChatGPT OAuth refresh tokens | Prefer API-key auth, one Codex auth volume per worker, or Codex concurrency 1 until live stress testing proves shared-volume refresh safe. |
+| Parallel jobs colliding on target networks/workspaces/logs | Use unique Compose project names, unique workspaces/logs, and locked or sharded JSONL output. |
 
 ---
 
-## 11. Out of scope for v1 (explicit)
+## 13. Out of scope for v1 (explicit)
 Multi-stage slim image; cross-run resume of agent sessions; a registry-published image; Kubernetes/job
 runner; automatic token refresh daemon; the worker-mesh/event-sourced framework upgrades (tracked
 separately in the redesign roadmap).
