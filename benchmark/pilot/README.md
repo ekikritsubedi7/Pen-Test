@@ -36,8 +36,8 @@ This was enabled by making the pipeline backend-pluggable: `pentestgpt --backend
 | `docker_results.jsonl` | Source-of-truth records for the completed Docker-network **pipeline** baseline. |
 | `DOCKER_REPORT.md` | Current comparable Docker-network baseline report. |
 | `docker_logs/<challenge>__<combo>.log` | Full captured stdout per Docker-network run. |
-| `docker_repeats.jsonl` | Repeat/supplemental Docker-network records. Legacy rows without `variant` are old pipeline repeats; new `pentestgpt_agent` framework rows are explicitly marked `variant=framework`. |
-| `run_docker_bench.py` | Docker-network runner: build → up → discover container IP/net → `docker run` the tool image on that net → flag-check → teardown. `--variant {single,pipeline,framework}`. Resumable. |
+| `docker_repeats.jsonl` | Repeat/supplemental Docker-network records. Legacy rows without `variant` are old pipeline repeats; new `pentestgpt_agent` framework rows are explicitly marked `variant=framework`; multiple `attempt` values may coexist. |
+| `run_docker_bench.py` | Docker-network runner: build → up → discover container IP/net → `docker run` the tool image on that net → flag-check → teardown. `--variant {single,pipeline,framework}`. Resumable by `(challenge, combo, variant, attempt)`. |
 | `docker_single_results.jsonl` | Records for the **pure single-agent** baseline (one bare `claude -p` / `codex exec` per target). |
 | `docker_framework_results.jsonl` | Records for the next-gen **framework** variant (`python3 -m pentestgpt_agent` instructor/executor/judge). |
 | `report_comparison.py` | Renders `DOCKER_COMPARISON.md` — pipeline vs. single-agent vs. framework, joined per (challenge, model). |
@@ -117,8 +117,9 @@ The single variant writes `docker_single_results.jsonl`; the comparison joins it
 canonical `docker_results.jsonl` pipeline baseline. The framework variant writes
 `docker_framework_results.jsonl` by default and can also append to `docker_repeats.jsonl` via
 `--out docker_repeats.jsonl`; its score comes from stdout plus generated
-`report.md`, not raw executor logs. For a strictly apples-to-apples comparison, run each refreshed
-variant on the **same image digest** as the pipeline baseline
+`report.md`, not raw executor logs. Re-run a benchmark pass with a new `--attempt N`; repeat rows
+are appended, and `DOCKER_COMPARISON.md` uses the latest row for each challenge/model/variant.
+For a strictly apples-to-apples comparison, run each refreshed variant on the **same image digest** as the pipeline baseline
 (`--image <ref>`; the digest + git commit are recorded per row). Useful env vars match the
 host harness: `PILOT_CODEX_EFFORT` (default `medium`), `PILOT_COMBOS`, `XBEN_ROOT` (target checkout),
 `DOCKER_IMAGE` (default `pentestgpt:latest`), and `PENTESTGPT_SOURCE_ROOT` (same as

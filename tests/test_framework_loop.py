@@ -41,6 +41,23 @@ def make_result(structured_output: Any) -> UnifiedResult:
     )
 
 
+def text_result(text: str, *, success: bool = True, error: str | None = None) -> UnifiedResult:
+    return UnifiedResult(
+        backend="fake",
+        success=success,
+        text=text,
+        structured_output=None,
+        usage=UnifiedUsage(),
+        cost_usd=None,
+        session_id=None,
+        duration_ms=None,
+        tool_calls=[],
+        file_changes=[],
+        events=[],
+        error=error,
+    )
+
+
 class FakeAgent:
     def __init__(self, responder: Any, *, delay: float = 0.0) -> None:
         self.responder = responder
@@ -62,6 +79,8 @@ class FakeAgent:
         out = self.responder(task, idx)
         if isinstance(out, BaseException):
             raise out
+        if isinstance(out, UnifiedResult):
+            return out
         return make_result(out)
 
 
@@ -305,6 +324,37 @@ async def test_unparseable_executor_output_becomes_failed_node(tmp_path: Path) -
     assert led.nodes["p"].status is NodeStatus.FAILED
     assert led.nodes["p"].failure_reason is not None
     assert "unparseable" in led.nodes["p"].failure_reason
+
+
+@pytest.mark.asyncio
+async def test_executor_prose_output_is_recorded_as_raw_evidence(tmp_path: Path) -> None:
+    instructor = FakeAgent(seq([instr(tasks=(tcard("p", "probe"),)), instr(propose=True)]))
+    executor = FakeAgent(always(text_result("Observed /wp-json/ and login form.")))
+    judge = FakeAgent(always(verdict("accept")))
+
+    result = await build(instructor, executor, judge, runs_root=tmp_path).run("goal")
+
+    led = load(result.run_id, runs_root=tmp_path)
+    node = led.nodes["p"]
+    assert node.status is NodeStatus.DONE
+    assert node.evidence is not None
+    assert node.evidence.raw_text == "Observed /wp-json/ and login form."
+    assert node.evidence.needs_followup is True
+    assert any("recorded as raw evidence" in note for note in led.notes)
+
+
+@pytest.mark.asyncio
+async def test_executor_api_error_text_remains_failed_node(tmp_path: Path) -> None:
+    instructor = FakeAgent(seq([instr(tasks=(tcard("p", "probe"),)), instr(propose=True)]))
+    executor = FakeAgent(always(text_result("API Error: 529 Overloaded.")))
+    judge = FakeAgent(always(verdict("accept")))
+
+    result = await build(instructor, executor, judge, runs_root=tmp_path).run("goal")
+
+    led = load(result.run_id, runs_root=tmp_path)
+    assert led.nodes["p"].status is NodeStatus.FAILED
+    assert led.nodes["p"].failure_reason is not None
+    assert "API Error" in led.nodes["p"].failure_reason
 
 
 @pytest.mark.asyncio

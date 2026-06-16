@@ -300,8 +300,15 @@ def _row_variant(row: dict) -> str:
     return str(row.get("variant") or "pipeline")
 
 
-def load_done(path: Path) -> set[tuple[str, str, str]]:
-    done: set[tuple[str, str, str]] = set()
+def _row_attempt(row: dict) -> int:
+    try:
+        return int(row.get("attempt") or 1)
+    except (TypeError, ValueError):
+        return 1
+
+
+def load_done(path: Path) -> set[tuple[str, str, str, int]]:
+    done: set[tuple[str, str, str, int]] = set()
     if path.exists():
         for line in path.read_text().splitlines():
             line = line.strip()
@@ -309,7 +316,7 @@ def load_done(path: Path) -> set[tuple[str, str, str]]:
                 continue
             with contextlib.suppress(Exception):
                 o = json.loads(line)
-                done.add((o["benchmark_id"], o["combo"], _row_variant(o)))
+                done.add((o["benchmark_id"], o["combo"], _row_variant(o), _row_attempt(o)))
     return done
 
 
@@ -578,12 +585,12 @@ async def run_agent(bench_id: str, meta: dict, net: str, url: str, combo: Combo,
                     variant: str, image: str, timeout: int, attempt: int,
                     source_root: Path | None) -> RunResult:
     ef = expected_flag(bench_id)
-    ws = WS_ROOT / f"{bench_id}__{combo.key}__{variant}"
+    ws = WS_ROOT / f"{bench_id}__{combo.key}__{variant}__attempt{attempt}"
     if ws.exists():
         shutil.rmtree(ws, ignore_errors=True)
     (ws / "workspace").mkdir(parents=True, exist_ok=True)
-    name = f"pgpt-bench-{bench_id}-{combo.key}-{variant}".lower().replace(".", "-")
-    log_path = LOG_DIR / f"{bench_id}__{combo.key}__{variant}.log"
+    name = f"pgpt-bench-{bench_id}-{combo.key}-{variant}-a{attempt}".lower().replace(".", "-")
+    log_path = LOG_DIR / f"{bench_id}__{combo.key}__{variant}__attempt{attempt}.log"
 
     argv = build_docker_cmd(variant, combo, net, url, name, image, ws / "workspace",
                             source_root)
@@ -622,7 +629,7 @@ async def run_benchmark(bench_id: str, variant: str, image: str, timeout: int,
         ok, why = await loop.run_in_executor(None, make_build, bench_id)
         if not ok:
             for combo in COMBOS:
-                if (bench_id, combo.key, variant) in done:
+                if (bench_id, combo.key, variant, attempt) in done:
                     continue
                 rr = RunResult(benchmark_id=bench_id, name=meta["name"], level=meta["level"],
                                tags=meta["tags"], combo=combo.key, backend=combo.backend,
@@ -635,7 +642,7 @@ async def run_benchmark(bench_id: str, variant: str, image: str, timeout: int,
             return
 
         for combo in COMBOS:
-            if (bench_id, combo.key, variant) in done:
+            if (bench_id, combo.key, variant, attempt) in done:
                 print(f"[{bench_id}/{combo.key}] skip (done)", flush=True)
                 continue
             await loop.run_in_executor(None, compose_down, bench_id)
@@ -702,7 +709,7 @@ async def main_run(args: argparse.Namespace) -> None:
         dry_run(benchmarks, args.variant, args.image, source_root)
         return
 
-    print(f"=== docker bench: variant={args.variant} image={args.image} "
+    print(f"=== docker bench: variant={args.variant} attempt={args.attempt} image={args.image} "
           f"combos={[c.key for c in COMBOS]} targets={benchmarks} "
           f"source_mount={bool(source_root)} -> {out_file.name} ===", flush=True)
     done = load_done(out_file)
