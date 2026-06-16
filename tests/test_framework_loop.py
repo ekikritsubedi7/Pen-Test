@@ -89,6 +89,7 @@ def tcard(
     instruction: str,
     *,
     context: str | None = None,
+    executor: str | None = None,
     depends_on: tuple[str, ...] = (),
     affected_target: str | None = "127.0.0.1:8000",
 ) -> dict[str, Any]:
@@ -96,7 +97,7 @@ def tcard(
         "id": cid,
         "instruction": instruction,
         "context": context,
-        "executor": None,
+        "executor": executor,
         "max_turns": None,
         "depends_on": list(depends_on),
         "affected_target": affected_target,
@@ -207,6 +208,22 @@ async def test_dependent_task_waits_for_dependency(tmp_path: Path) -> None:
 
     order = [c.task.instruction for c in executor.calls]
     assert order == ["probe recon", "probe exploit"]  # recon strictly before exploit
+
+
+@pytest.mark.asyncio
+async def test_unknown_executor_label_falls_back_to_default(tmp_path: Path) -> None:
+    instructor = FakeAgent(
+        seq([instr(tasks=(tcard("p", "probe endpoint", executor="web-recon"),)), instr(propose=True)])
+    )
+    executor = FakeAgent(always(evidence()))
+    judge = FakeAgent(always(verdict("accept")))
+
+    loop = build(instructor, executor, judge, runs_root=tmp_path)
+    await loop.run("goal")
+
+    assert [c.task.instruction for c in executor.calls] == ["probe endpoint"]
+    assert loop.ledger is not None
+    assert any("unknown executor 'web-recon'" in note for note in loop.ledger.notes)
 
 
 @pytest.mark.asyncio
