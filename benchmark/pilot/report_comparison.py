@@ -7,7 +7,8 @@ Joins docker-network result sets by (benchmark_id, combo):
                docker_pipeline_results.jsonl if you refreshed it via run_docker_bench.py).
   - single   : the "pure single agent" baseline (docker_single_results.jsonl).
   - framework: the next-gen `pentestgpt_agent` instructor/executor/judge framework
-               (docker_framework_results.jsonl), when present.
+               (docker_framework_results.jsonl and framework-tagged docker_repeats.jsonl rows,
+               when present).
 
 The headline solve rates are computed on the *head-to-head* set — the benchmarks
 where BOTH variants produced a real (non-infra) run for that model — so the two
@@ -26,6 +27,7 @@ from report import COMBO_LABEL, COMBO_ORDER, MARK, is_infra  # reuse the baselin
 PILOT_DIR = Path(__file__).resolve().parent
 SINGLE_JSONL = PILOT_DIR / "docker_single_results.jsonl"
 FRAMEWORK_JSONL = PILOT_DIR / "docker_framework_results.jsonl"
+REPEATS_JSONL = PILOT_DIR / "docker_repeats.jsonl"
 PIPELINE_CANDIDATES = [PILOT_DIR / "docker_results.jsonl", PILOT_DIR / "docker_pipeline_results.jsonl"]
 REPORT_MD = PILOT_DIR / "DOCKER_COMPARISON.md"
 
@@ -56,6 +58,12 @@ def _pipeline_rows() -> list[dict]:
     return []
 
 
+def _framework_rows() -> list[dict]:
+    rows = _load(FRAMEWORK_JSONL)
+    rows.extend(r for r in _load(REPEATS_JSONL) if r.get("variant") == "framework")
+    return rows
+
+
 def _cell(r: dict | None) -> str:
     if r is None:
         return "·"
@@ -69,7 +77,7 @@ def _cell(r: dict | None) -> str:
 def render() -> None:
     pipe = _by_bc(_pipeline_rows())
     single = _by_bc(_load(SINGLE_JSONL))
-    framework = _by_bc(_load(FRAMEWORK_JSONL))
+    framework = _by_bc(_framework_rows())
     if not single:
         print(f"no single-agent results yet — run: uv run python {Path(__file__).name.replace('report_comparison','run_docker_bench')} --variant single")
         return

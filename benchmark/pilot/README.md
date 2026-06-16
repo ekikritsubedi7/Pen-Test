@@ -36,7 +36,7 @@ This was enabled by making the pipeline backend-pluggable: `pentestgpt --backend
 | `docker_results.jsonl` | Source-of-truth records for the completed Docker-network **pipeline** baseline. |
 | `DOCKER_REPORT.md` | Current comparable Docker-network baseline report. |
 | `docker_logs/<challenge>__<combo>.log` | Full captured stdout per Docker-network run. |
-| `docker_repeats.jsonl` | Partial retry records from the Opus/Sonnet repeat run; use only when explicitly aggregating retries. |
+| `docker_repeats.jsonl` | Repeat/supplemental Docker-network records. Legacy rows without `variant` are old pipeline repeats; new `pentestgpt_agent` framework rows are explicitly marked `variant=framework`. |
 | `run_docker_bench.py` | Docker-network runner: build → up → discover container IP/net → `docker run` the tool image on that net → flag-check → teardown. `--variant {single,pipeline,framework}`. Resumable. |
 | `docker_single_results.jsonl` | Records for the **pure single-agent** baseline (one bare `claude -p` / `codex exec` per target). |
 | `docker_framework_results.jsonl` | Records for the next-gen **framework** variant (`python3 -m pentestgpt_agent` instructor/executor/judge). |
@@ -115,7 +115,8 @@ uv run python run_docker_bench.py --report     # or: uv run python report_compar
 
 The single variant writes `docker_single_results.jsonl`; the comparison joins it against the
 canonical `docker_results.jsonl` pipeline baseline. The framework variant writes
-`docker_framework_results.jsonl` when present; its score comes from stdout plus generated
+`docker_framework_results.jsonl` by default and can also append to `docker_repeats.jsonl` via
+`--out docker_repeats.jsonl`; its score comes from stdout plus generated
 `report.md`, not raw executor logs. For a strictly apples-to-apples comparison, run each refreshed
 variant on the **same image digest** as the pipeline baseline
 (`--image <ref>`; the digest + git commit are recorded per row). Useful env vars match the

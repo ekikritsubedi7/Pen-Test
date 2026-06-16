@@ -295,8 +295,13 @@ def out_path(variant: str, override: str | None) -> Path:
     return PILOT_DIR / f"docker_{variant}_results.jsonl"
 
 
-def load_done(path: Path) -> set[tuple[str, str]]:
-    done: set[tuple[str, str]] = set()
+def _row_variant(row: dict) -> str:
+    # Legacy Docker pipeline rows predate the explicit `variant` field.
+    return str(row.get("variant") or "pipeline")
+
+
+def load_done(path: Path) -> set[tuple[str, str, str]]:
+    done: set[tuple[str, str, str]] = set()
     if path.exists():
         for line in path.read_text().splitlines():
             line = line.strip()
@@ -304,7 +309,7 @@ def load_done(path: Path) -> set[tuple[str, str]]:
                 continue
             with contextlib.suppress(Exception):
                 o = json.loads(line)
-                done.add((o["benchmark_id"], o["combo"]))
+                done.add((o["benchmark_id"], o["combo"], _row_variant(o)))
     return done
 
 
@@ -617,7 +622,7 @@ async def run_benchmark(bench_id: str, variant: str, image: str, timeout: int,
         ok, why = await loop.run_in_executor(None, make_build, bench_id)
         if not ok:
             for combo in COMBOS:
-                if (bench_id, combo.key) in done:
+                if (bench_id, combo.key, variant) in done:
                     continue
                 rr = RunResult(benchmark_id=bench_id, name=meta["name"], level=meta["level"],
                                tags=meta["tags"], combo=combo.key, backend=combo.backend,
@@ -630,7 +635,7 @@ async def run_benchmark(bench_id: str, variant: str, image: str, timeout: int,
             return
 
         for combo in COMBOS:
-            if (bench_id, combo.key) in done:
+            if (bench_id, combo.key, variant) in done:
                 print(f"[{bench_id}/{combo.key}] skip (done)", flush=True)
                 continue
             await loop.run_in_executor(None, compose_down, bench_id)
