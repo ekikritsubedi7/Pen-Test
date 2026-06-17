@@ -287,6 +287,9 @@ class RunResult:
     git_commit: str = ""
     error: str = ""
     source_mount: bool = False
+    timeout_s: int = 0
+    harness_concurrency: int = 0
+    framework_executor_concurrency: int = 0
 
 
 def out_path(variant: str, override: str | None) -> Path:
@@ -346,6 +349,7 @@ def build_docker_cmd(
     image: str,
     ws: Path,
     source_root: Path | None = None,
+    framework_executor_concurrency: int = 1,
 ) -> list[str]:
     """Construct the full `docker run ...` argv for one (variant, combo) run."""
     base = [
@@ -398,7 +402,7 @@ def build_docker_cmd(
             "--max-verifications",
             "1",
             "--executor-concurrency",
-            "1",
+            str(framework_executor_concurrency),
         ]
 
     # single variant — literal bare CLI, one turn, one-shot prompt.
@@ -601,7 +605,8 @@ async def _run_container(argv: list[str], name: str, timeout: int) -> tuple[str,
 
 async def run_agent(bench_id: str, meta: dict, net: str, url: str, combo: Combo,
                     variant: str, image: str, timeout: int, attempt: int,
-                    source_root: Path | None) -> RunResult:
+                    source_root: Path | None, harness_concurrency: int,
+                    framework_executor_concurrency: int) -> RunResult:
     ef = expected_flag(bench_id)
     ws = WS_ROOT / f"{bench_id}__{combo.key}__{variant}__attempt{attempt}"
     if ws.exists():
@@ -611,7 +616,7 @@ async def run_agent(bench_id: str, meta: dict, net: str, url: str, combo: Combo,
     log_path = LOG_DIR / f"{bench_id}__{combo.key}__{variant}__attempt{attempt}.log"
 
     argv = build_docker_cmd(variant, combo, net, url, name, image, ws / "workspace",
-                            source_root)
+                            source_root, framework_executor_concurrency)
     start = time.time()
     out, timed_out = await _run_container(argv, name, timeout)
     dur = time.time() - start
@@ -635,12 +640,15 @@ async def run_agent(bench_id: str, meta: dict, net: str, url: str, combo: Combo,
         duration_s=round(dur, 1), cost_usd=round(scored["cost"], 4), codex_tokens=scored["tokens"],
         target_url=url, variant=variant, attempt=attempt, docker_image=image_digest(image),
         git_commit=git_commit(), error=err, source_mount=source_root is not None,
+        timeout_s=timeout, harness_concurrency=harness_concurrency,
+        framework_executor_concurrency=framework_executor_concurrency if variant == "framework" else 0,
     )
 
 
 async def run_benchmark(bench_id: str, variant: str, image: str, timeout: int,
                         attempt: int, done: set, out_file: Path, sem: asyncio.Semaphore,
-                        source_root: Path | None) -> None:
+                        source_root: Path | None, harness_concurrency: int,
+                        framework_executor_concurrency: int) -> None:
     async with sem:
         meta = bench_meta(bench_id)
         loop = asyncio.get_event_loop()
@@ -654,7 +662,11 @@ async def run_benchmark(bench_id: str, variant: str, image: str, timeout: int,
                                model=combo.model, status="BUILD_ERROR", expected_flag=expected_flag(bench_id),
                                variant=variant, attempt=attempt, docker_image=image,
                                git_commit=git_commit(), error=why[:200],
-                               source_mount=source_root is not None)
+                               source_mount=source_root is not None, timeout_s=timeout,
+                               harness_concurrency=harness_concurrency,
+                               framework_executor_concurrency=(
+                                   framework_executor_concurrency if variant == "framework" else 0
+                               ))
                 append_result(rr, out_file)
             print(f"[{bench_id}] BUILD_ERROR: {why[:120]}", flush=True)
             return
@@ -674,26 +686,32 @@ async def run_benchmark(bench_id: str, variant: str, image: str, timeout: int,
                                target_url=url or "", variant=variant, attempt=attempt,
                                docker_image=image, git_commit=git_commit(),
                                error=f"target not up: {up_why}"[:200],
-                               source_mount=source_root is not None)
+                               source_mount=source_root is not None, timeout_s=timeout,
+                               harness_concurrency=harness_concurrency,
+                               framework_executor_concurrency=(
+                                   framework_executor_concurrency if variant == "framework" else 0
+                               ))
                 append_result(rr, out_file)
                 print(f"[{bench_id}/{combo.key}] target-not-up", flush=True)
                 continue
             print(f"[{bench_id}/{combo.key}/{variant}] running @ {url} (net={net})", flush=True)
             rr = await run_agent(bench_id, meta, net, url, combo, variant, image, timeout,
-                                 attempt, source_root)
+                                 attempt, source_root, harness_concurrency,
+                                 framework_executor_concurrency)
             append_result(rr, out_file)
             print(f"[{bench_id}/{combo.key}/{variant}] {rr.status} t={rr.duration_s}s "
                   f"cost=${rr.cost_usd} tok={rr.codex_tokens}", flush=True)
         await loop.run_in_executor(None, compose_down, bench_id)
 
 
-def dry_run(benchmarks: list[str], variant: str, image: str, source_root: Path | None) -> None:
+def dry_run(benchmarks: list[str], variant: str, image: str, source_root: Path | None,
+            framework_executor_concurrency: int) -> None:
     """Print the docker command + assembled prompt for the first benchmark/combo."""
     bid = benchmarks[0]
     url = "http://172.28.0.2:80"  # illustrative; real IP discovered at run time
     for combo in COMBOS:
         argv = build_docker_cmd(variant, combo, "xben-net", url, f"pgpt-dry-{combo.key}", image,
-                                Path("/tmp/ws"), source_root)
+                                Path("/tmp/ws"), source_root, framework_executor_concurrency)
         print(f"\n=== {bid} / {combo.key} / {variant} ===")
         # redact the long prompt envs for readability
         printable = []
@@ -724,17 +742,19 @@ async def main_run(args: argparse.Namespace) -> None:
         raise SystemExit(f"--source-root does not exist: {source_root}")
 
     if args.dry_run:
-        dry_run(benchmarks, args.variant, args.image, source_root)
+        dry_run(benchmarks, args.variant, args.image, source_root, args.framework_executor_concurrency)
         return
 
     print(f"=== docker bench: variant={args.variant} attempt={args.attempt} image={args.image} "
           f"combos={[c.key for c in COMBOS]} targets={benchmarks} "
+          f"timeout={args.timeout}s concurrency={args.concurrency} "
+          f"framework_executor_concurrency={args.framework_executor_concurrency if args.variant == 'framework' else 0} "
           f"source_mount={bool(source_root)} -> {out_file.name} ===", flush=True)
     done = load_done(out_file)
     sem = asyncio.Semaphore(args.concurrency)
     await asyncio.gather(*(
         run_benchmark(b, args.variant, args.image, args.timeout, args.attempt, done, out_file,
-                      sem, source_root)
+                      sem, source_root, args.concurrency, args.framework_executor_concurrency)
         for b in benchmarks
     ))
     print("=== DOCKER BENCH COMPLETE ===", flush=True)
@@ -746,6 +766,8 @@ def main() -> None:
     ap.add_argument("--image", default=DEFAULT_IMAGE, help="tool image ref/tag")
     ap.add_argument("--timeout", type=int, default=600, help="per-agent-run timeout (s)")
     ap.add_argument("--concurrency", type=int, default=1, help="benchmarks in parallel (JOBS)")
+    ap.add_argument("--framework-executor-concurrency", type=int, default=1,
+                    help="executor sessions per framework run")
     ap.add_argument("--attempt", type=int, default=1, help="attempt number (for repeats)")
     ap.add_argument("--benchmarks", type=str, default="", help="comma list to override default 10")
     ap.add_argument("--out", type=str, default="", help="output jsonl (default docker_<variant>_results.jsonl)")
