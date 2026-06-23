@@ -1,4 +1,5 @@
-<!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
+wingo 1minit number prediction penal hack 
+<!-- [Improved](https://www.jaiclub18.com/#/saasLottery/WinGo?gameCode=WinGo_30S&lottery=WinGo) compatibility of back to top link: [See](https://www.jaiclub18.com/#/saasLottery/WinGo?gameCode=WinGo_30S&lottery=WinGo): https://github.com/othneildrew/Best-README-Template/pull/73 -->
 <a name="readme-top"></a>
 
 <!-- PROJECT SHIELDS -->
