@@ -39,6 +39,9 @@ dependencies = [
     "google-genai>=1.0.0",
 ]
 
+[project.optional-dependencies]
+litellm = ["litellm>=1.80.0"]
+
 [project.scripts]
 pentestgpt = "pentestgpt.interface.main:main"
 pentestgpt-legacy = "pentestgpt_legacy.main:main"
