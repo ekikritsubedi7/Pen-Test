@@ -42,14 +42,22 @@ This was enabled by making the pipeline backend-pluggable: `pentestgpt --backend
 | `docker_framework_results.jsonl` | Records for the next-gen **framework** variant (`python3 -m pentestgpt_agent` instructor/executor/judge). |
 | `report_comparison.py` | Renders `DOCKER_COMPARISON.md` — pipeline vs. single-agent vs. framework, joined per (challenge, model). |
 | `DOCKER_COMPARISON.md` | Generated pipeline/single/framework comparison report. |
-| `selected.json` | The challenge set used for the last run. |
+| `docker_bestof3_*.jsonl` | Robust rerun files for first-three-valid-attempt best-of-k comparisons. |
+| `report_best_of.py` | Renders `DOCKER_BEST_OF_3.md`, excluding infra/auth/liveness/Docker-run/interrupted rows from valid-attempt counts. |
+| `run_bestof3_suite.py` | Runs the final best-of-three suite: canary, `single`, `pipeline`, `framework`, then report generation and completion validation. |
+| `benchmark_sets.json` | Version-controlled registry of **named, toggleable** challenge sets. Each challenge carries an `enabled` flag plus `level`/`tags`/`solved_by_framework`/`note` metadata. Seeded with `hard-open`. |
+| `bench_set.py` | Agent-friendly CLI over `run_docker_bench.py`: `list` / `ids` / `enable` / `disable` / `run` for a named set. Resolves `XBEN_ROOT`, auto-suggests parallelism, and drives Docker. |
+| `selected.json` | The challenge set used for the last `run_pilot.py` run (gitignored write-only artifact; superseded by `benchmark_sets.json` for the Docker path). |
 
 ## Prerequisites
 
 - Docker (running), `make`, `openssl`, `curl`.
 - The xbow fixtures checked out locally (a separate `xbow-validation-benchmarks` checkout). Set the
-  path at the top of `run_pilot.py` (`BENCH_ROOT`).
-- Authenticated `claude` CLI and `codex` CLI on `PATH` (`claude` logged in; `codex login`).
+  path with `XBEN_ROOT` for `run_docker_bench.py` or at the top of `run_pilot.py` (`BENCH_ROOT`) for
+  the older host-loopback runner.
+- For Docker-network runs: build the tool image and persist CLI auth first:
+  `make docker-build`, `make docker-login`, then verify with `make docker-auth-status`.
+- For host-loopback runs only: authenticated `claude` CLI and `codex` CLI on the host `PATH`.
 - `uv sync` in the repo root.
 
 ## Usage: host-loopback harness
@@ -78,8 +86,8 @@ is the committed Docker-network baseline.
 
 ## Usage: Docker-network harness + comparison variants
 
-`run_docker_bench.py` runs container-to-container (no host-loopback ports): it brings the target up
-with Compose, discovers the target container's internal `172.x` IP + Docker network, and `docker
+`run_docker_bench.py` runs container-to-container (no host-loopback target URL): it brings the target
+up with Compose, discovers the target container's internal `172.x` IP + Docker network, and `docker
 run`s the tool image on that same network. It builds the image-side auth from the persisted volumes
 (`pentestgpt-claude` / `pentestgpt-codex`), so run `make docker-build` + `make docker-login` first.
 
@@ -100,8 +108,27 @@ PILOT_COMBOS="claude-sonnet" uv run python run_docker_bench.py --benchmarks XBEN
 # Optional: refresh the *pipeline* baseline under the identical harness/image (-> docker_pipeline_results.jsonl):
 uv run python run_docker_bench.py --variant pipeline
 
+# Parallel smoke: two different benchmark Compose projects run at once; combos remain serial
+# inside each benchmark, so the same target stack is never attacked by two agents at once.
+PILOT_COMBOS="claude-sonnet" uv run python run_docker_bench.py \
+  --variant pipeline \
+  --benchmarks XBEN-001-24,XBEN-068-24 \
+  --timeout 900 \
+  --concurrency 2 \
+  --out docker_parallel_smoke.jsonl
+
+# Final best-of-3 comparison: native single agent vs pentestgpt pipeline vs pentestgpt_agent.
+cd ../..
+make docker-bench-bestof3
+cd benchmark/pilot
+
 # Next-gen framework smoke/benchmark. --source-root mounts the current checkout at /app so the
 # container can use local Python changes without rebuilding the tool image.
+cd ../..
+make docker-bench-agent-quick
+cd benchmark/pilot
+
+# Equivalent raw runner form for custom sweeps:
 PILOT_COMBOS="claude-sonnet" uv run python run_docker_bench.py \
   --variant framework \
   --image pentestgpt:latest \
@@ -120,6 +147,26 @@ canonical `docker_results.jsonl` pipeline baseline. The framework variant writes
 `report.md` and judge-accepted `ledger.json` findings, not raw executor logs. Re-run a benchmark
 pass with a new `--attempt N`; repeat rows are appended, and `DOCKER_COMPARISON.md` uses the
 latest row for each challenge/model/variant.
+For robust final results, use `make docker-bench-bestof3`. It runs a framework canary, then
+timestamped `single`, `pipeline`, and `framework` best-of-three sweeps, renders
+`DOCKER_BEST_OF_3_<run-id>.md`, and fails clearly if any cells are incomplete. Reuse the same
+`BOF3_RUN_ID` to fill retryable infra/auth/liveness rows without losing prior valid attempts.
+The runner defaults to the fixture's normal Compose project because these challenges pre-build images
+under their default names. `--concurrency N` parallelizes across distinct benchmarks while each
+benchmark's model combos remain serial. `docker compose up` is run with `--no-build` and a Docker
+daemon preflight runs before any rows are appended, so Docker/Desktop failures fail fast instead of
+turning into hundreds of duplicate infra rows. Benchmarks that declare fixed host `ports:` are
+automatically serialized only against other jobs using the same host port; dynamic `ports: [80]`
+fixtures still run in parallel. `--unique-compose-project` is an advanced mode for fixtures that
+tolerate project-prefixed image names; otherwise use the default project mode. Codex cells default
+to `--max-codex 1` because shared ChatGPT OAuth refresh tokens can race; pass `--max-codex 0` only
+when using auth that is safe to refresh concurrently.
+The preferred local verification after changing `pentestgpt_agent/` is
+`make docker-bench-agent-quick` from the repo root. Defaults are
+`AGENT_BENCH_TARGETS=XBEN-080-24`, `AGENT_BENCH_COMBOS=claude-sonnet`,
+`AGENT_BENCH_CONCURRENCY=1`, `AGENT_BENCH_EXECUTOR_CONCURRENCY=2`, `AGENT_BENCH_TIMEOUT=1200`, and
+`AGENT_BENCH_OUT=docker_framework_quick.jsonl`. The target uses a timestamped
+`AGENT_BENCH_ATTEMPT` by default so repeated runs do not skip stale completed rows.
 For a strictly apples-to-apples comparison, run each refreshed variant on the **same image digest** as the pipeline baseline
 (`--image <ref>`; the digest + git commit are recorded per row). Useful env vars match the
 host harness: `PILOT_CODEX_EFFORT` (default `medium`), `PILOT_COMBOS`, `XBEN_ROOT` (target checkout),
@@ -130,6 +177,68 @@ host harness: `PILOT_CODEX_EFFORT` (default `medium`), `PILOT_COMBOS`, `XBEN_ROO
 bodies), so the single variant scores only the agent's *verbalized* text — claude `assistant` blocks
 / codex `agent_message` items — never raw tool output. The framework variant scores its generated
 report plus final stdout for the same ground-truth flag. This keeps the head-to-head fair.
+
+## Benchmark sets (toggleable) — `bench_set.py`
+
+`benchmark_sets.json` defines **named challenge sets** you can flip on and off per
+challenge, so you (or an agent) curate a set once and re-run it without editing code
+or retyping `--benchmarks` lists. `bench_set.py` is a thin, agent-friendly wrapper
+over `run_docker_bench.py`: it selects the enabled challenges, resolves `XBEN_ROOT`,
+picks parallelism, and shells out. Docker is still triggered entirely inside the
+runner (`make build` → `docker compose up` → discover target IP → `docker run` the
+tool image → score → teardown).
+
+The seed set is **`hard-open`**: all 8 hard (level-3) XBOW challenges plus 2
+proven-solvable medium controls (`XBEN-001-24`, `XBEN-080-24`). Its `solved_by_framework`
+flags record that only `XBEN-057-24` has ever fallen to `pentestgpt_agent`; the rest
+are the framework's open hard problems (`XBEN-093-24` and the `Cross` XSS challenges
+have known EOL-Debian/phantomjs build issues — expect to need
+`DOCKER_DEFAULT_PLATFORM=linux/amd64` or an `archive.debian.org` apt pin first).
+
+```bash
+cd benchmark/pilot
+
+# See a set and its on/off state (--json for machine parsing):
+uv run python bench_set.py list --set hard-open
+uv run python bench_set.py list --set hard-open --json
+
+# Print just the enabled ids (composes with other tools/targets):
+uv run python bench_set.py ids --set hard-open
+#   -> feed the existing bestof3 suite:  make docker-bench-bestof3 BOF3_BENCHMARKS=$(uv run python bench_set.py ids)
+
+# Toggle challenges (persists to benchmark_sets.json; 'all' targets every entry):
+uv run python bench_set.py disable XBEN-057-24 XBEN-101-24     # drop the already-solved ones
+uv run python bench_set.py enable XBEN-057-24
+
+# Run the enabled challenges. --concurrency auto prints host facts and picks a
+# conservative parallelism; pass a number to fix it. --dry-run shows the exact
+# run_docker_bench.py command(s) without running anything.
+uv run python bench_set.py run --set hard-open --variant framework --concurrency auto --dry-run
+uv run python bench_set.py run --set hard-open --variant framework --concurrency auto
+```
+
+**Agent flow.** An agent typically: (1) `list --json` to read the set + toggle state,
+(2) `enable`/`disable` to curate, (3) `run --concurrency auto` (or an explicit `N`) —
+the tool prints CPU-core count and the enabled count so the agent can choose how many
+benchmarks run in parallel. `--variant both` runs `single` then `framework`
+sequentially. Results go to `docker_<variant>_<set>.jsonl` unless `--out` overrides.
+
+**`XBEN_ROOT` resolution.** `bench_set.py` uses `--xben-root` → `$XBEN_ROOT` → a list
+of known checkout paths, and errors clearly if none exist. (The hardcoded default in
+`run_docker_bench.py` is a dead path; point `XBEN_ROOT` at a real
+`xbow-engineering/validation-benchmarks` checkout of `XBEN-*-24` dirs.) It preflights
+that every enabled challenge dir exists and refuses to run if any are missing (pass
+`--allow-missing` to override); build failures still surface as `BUILD_ERROR` rows.
+
+Make wrappers:
+
+```bash
+make docker-bench-set-list                          # show the default set (BENCH_SET=hard-open)
+make docker-bench-set BENCH_SET_DRY_RUN=1           # print the plan + commands
+make docker-bench-set BENCH_SET_COMBOS=claude-sonnet BENCH_SET_CONCURRENCY=2
+# Knobs: BENCH_SET, BENCH_SET_VARIANT{framework|single|both}, BENCH_SET_CONCURRENCY{auto|N},
+#        BENCH_SET_COMBOS, BENCH_SET_TIMEOUT, BENCH_SET_ATTEMPTS, BENCH_SET_MAX_CODEX, BENCH_SET_XBEN_ROOT
+```
 
 ## How the host-loopback harness works
 
@@ -196,16 +305,23 @@ were runnable; **6** were fully covered by all four models. Fully-covered headli
 - [x] **Comparable Docker baseline** — 10 representative L2/L3 targets × 4 models, container-to-container.
 - [x] **Reusable Docker-network runner** — `run_docker_bench.py` supports `single`, `pipeline`, and
       `framework` variants with resumable JSONL output.
-- [ ] **Makefile wrapper / full-sweep ergonomics** — add `make docker-bench` around the runner and
-      keep a conservative `--jobs`/`JOBS` knob for parallel execution.
+- [x] **Safe default-project parallelism** — `--concurrency N` now runs distinct benchmarks in
+      parallel without `--unique-compose-project`, uses `docker compose up --no-build`, preflights
+      Docker, serializes overlapping fixed host ports, and keeps Codex at `--max-codex 1` by default.
+- [x] **Quick framework verification target** — `make docker-bench-agent-quick` runs the default
+      local `pentestgpt_agent` Docker-network smoke for code-change validation.
+- [x] **Final best-of-3 wrapper** — `make docker-bench-bestof3` runs the 10-target comparison suite
+      with canary, timestamped outputs, report generation, and completion validation.
+- [ ] **Full-sweep Makefile ergonomics** — add a separate full-59-target wrapper and map a
+      conservative `JOBS` knob to runner `--concurrency`.
 - [ ] **Full medium/hard sweep** — all 59 challenges (51 L2 + 8 L3) × 4 models.
 - [ ] **arm64 infra fixes** — `mysql:5.7` has no arm64 manifest (XBEN-040/078); several XSS images
       are EOL Debian-buster/phantomjs (apt 404: XBEN-091/093/100). Fix with `DOCKER_DEFAULT_PLATFORM=linux/amd64`
       emulation, a `mariadb` swap, or an `archive.debian.org` apt pin; else document as excluded.
 - [ ] **Cost accounting** — Claude `$` is only captured on a clean `[DONE]`; solved-but-timed-out
       runs report $0. Add a Codex token→$ estimate for cross-model comparability.
-- [ ] **Multi-attempt (best-of-k)** — the Dec-2025 baseline showed flaky timeouts recover on retry;
-      single-shot solve rates are a lower bound.
+- [ ] **Execute final best-of-3 results** — run `make docker-bench-bestof3` on the 10-target suite
+      and commit or archive the generated timestamped report.
 - [ ] **Codex effort sweep** — currently pinned `medium`; compare low/medium/high.
 - [ ] **Tests/CI** — `CodexBackend` translation has unit coverage; still wire `pentestgpt_agent/` +
       `unified_agent/` into Makefile lint/typecheck.
@@ -219,101 +335,73 @@ monitored workstation that traffic (a) trips host endpoint-security and (b) hits
 failures. We want to run the *entire* 59-challenge × 4-model sweep unattended, isolated from host
 monitoring, and reproducibly.
 
-**Key insight.** The host-loopback harness publishes each target to host loopback (`127.0.0.1:<port>`) and
-runs the agent on the host — so all scan traffic crosses **host** endpoints that EDR watches. If
-instead the **agent and the target sit on the same internal Docker bridge with no host-published
-ports**, the scan/exploit traffic is container→container on an isolated network and never touches a
-host endpoint. The only traffic leaving is the model-API HTTPS calls (ordinary, allowed egress).
+**Key insight.** The host-loopback harness publishes each target to host loopback
+(`127.0.0.1:<port>`) and runs the agent on the host, so scan traffic crosses **host** endpoints that
+EDR watches. The Docker-network harness instead discovers the target container's internal
+Docker-network IP and points the tool container at that URL. The fixture may still publish an
+ephemeral or fixed host port because the original Compose files say so, but the benchmark agent does
+not attack that host-loopback URL.
 
-The current 10-target Docker baseline used the core of this design: the target stack ran in Docker,
-the tool ran in `pentestgpt:latest`, and the tool container joined the target Docker network so scan
-traffic was container-to-container. The reusable in-repo command is still open work.
+### Current architecture
 
-### Recommended architecture for the full sweep
-
-```
-┌──────────────────────────── benchmark host / dedicated VM ─────────────────────────────┐
-│                                                                                          │
-│   docker network: xben-bench-<id>  (--internal: NO route off-host) ── isolates scans     │
-│        ┌──────────────┐                        ┌──────────────────────────────────┐      │
-│        │ target stack │  ← nmap/gobuster/RCE → │ agent container                  │      │
-│        │ (compose,    │   (container↔container)│  uv + pentestgpt + claude/codex  │      │
-│        │  no host     │                        │  + nmap/gobuster/sqlmap/...      │      │
-│        │  ports)      │                        │                                  │      │
-│        └──────────────┘                        └───────────────┬──────────────────┘      │
-│                                                                 │ 2nd NIC (egress-only)   │
-│                                                       default bridge → NAT → internet     │
-│                                                       (HTTPS to Anthropic / OpenAI only)  │
-└──────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
-- **Two networks per run.** Target compose stack attaches to an `--internal` bridge
-  (`xben-bench-<id>`) with **no `ports:` published to the host** → unreachable from the host, scans
-  stay on the bridge. The **agent container** attaches to *both* that internal bridge (to reach the
-  target by service name/IP) **and** a normal NAT bridge used *only* for model-API egress.
-- **Agent runs in a container**, not on the host — so its tool processes and scan traffic are
-  contained. Reuse the existing `pentestgpt:latest` image, which already has the pipeline, Claude CLI,
-  Codex CLI, `uv`, and the core pentest toolchain.
-- **Orchestrator** mounts the host Docker socket (`/var/run/docker.sock`) — simplest — or true DinD
-  for full nesting. It loops challenges exactly like `run_pilot.py` but creates the per-run internal
-  network + connects the agent container instead of publishing ports.
-- **Auth** mounted into the agent container through the persisted login volumes
-  (`pentestgpt-claude`, `pentestgpt-codex`) so the CLIs are logged in non-interactively and can refresh
-  tokens.
-- **Arch** uniform via `DOCKER_DEFAULT_PLATFORM=linux/amd64` (Rosetta/qemu emulation) so `mysql:5.7`
-  and friends build/run everywhere; bump per-run timeout to absorb emulation slowdown.
-- **Persistence** — keep `benchmark/pilot/*results.jsonl`, reports, and logs on the host so results
-  survive and the run stays resumable.
+- **Host-driven orchestration.** `run_docker_bench.py` runs on the host and talks to the host Docker
+  daemon. It does not mount `docker.sock` into a long-lived worker container.
+- **One tool container per cell.** Each active `(attempt, benchmark, combo, variant)` gets a fresh
+  `pentestgpt:latest` container, a unique workspace under `/tmp/pgpt_docker_ws`, and a unique log row.
+- **Target by internal URL.** The runner parses `docker compose ps` and `docker inspect` to find the
+  non-database service's Docker network and internal IP/port, then runs the tool container on that
+  network.
+- **Persisted auth volumes.** `pentestgpt-claude` and `pentestgpt-codex` are mounted into the tool
+  container. Claude can run concurrently; Codex is capped by default because shared ChatGPT refresh
+  tokens can race.
+- **Durable results.** JSONL outputs, reports, and logs stay under `benchmark/pilot/` so interrupted
+  runs can resume and infra rows remain auditable.
 
 ### Parallel execution policy
 
-The benchmark runner should parallelize at the **job/container** level, not by packing several real
-benchmark runs into one long-lived tool container. A job is one `(attempt, benchmark, combo)` run:
-bring up one fresh target stack, attach one fresh PentestGPT tool container, write one log/result row,
-then tear everything down.
+The current runner parallelizes at the **benchmark worker** level. One active cell is
+`(attempt, benchmark, combo, variant)`: bring up one fresh target stack, attach one fresh PentestGPT
+tool container, write one log/result row, then tear everything down.
 
-Required isolation per job:
+Current implementation rules:
 
-- Unique Docker Compose project name, e.g. `pgpt-a2-xben075-claude-sonnet`, so networks, containers,
-  and volumes do not collide.
-- Unique workspace path, e.g. `/tmp/pgpt_docker_bench_ws/attempt2__XBEN-075-24__claude-sonnet`.
-- Unique log path, and either a locked JSONL writer or one per-worker JSONL shard merged after the run.
-- Cleanup by project/container id, not by broad image or name prefixes except for explicit emergency
-  cleanup.
-
-Operational guidance:
-
-- Start the full runner at `--jobs 2`. Move to `--jobs 4` only after a small representative matrix is
-  clean. The current Docker host can schedule 2-way and 4-way lightweight tool-container probes, but
-  real model runs also contend on target CPU, memory, provider rate limits, and OAuth token refresh.
-- Keep one tool container per job even if several worker processes can technically run inside one
-  container. Separate containers make logs, workspaces, process trees, and teardown simpler.
-- Claude parallelism is lower risk because the persisted `setup-token` is read from the volume and
-  exported as `CLAUDE_CODE_OAUTH_TOKEN`.
-- Codex parallelism needs extra care. ChatGPT OAuth refresh tokens rotate, so concurrent writers to the
-  same `pentestgpt-codex` volume can race. For parallel Codex sweeps, prefer API-key auth, one Codex
-  auth volume per worker, or keep Codex jobs at concurrency 1 until a live round-trip stress test proves
-  shared-volume refresh is safe.
-- Make the runner resumable by keying completed rows on `(attempt, benchmark_id, combo)`. Missing rows
-  can then be filled without disturbing completed work.
+- Use the fixture's **default Compose project** for normal runs. XBOW builds images under those
+  default project names, so a synthetic `-p pgpt-...` name can make Compose look for different image
+  tags. The runner uses `docker compose up --no-build`; if images are missing, the row fails fast
+  instead of rebuilding or destabilizing Docker Desktop.
+- `--concurrency N` runs distinct benchmark directories in parallel. Combos inside one benchmark stay
+  serial, so the same default Compose project is never attacked by two agents at once.
+- Fixed host `ports:` are detected from Compose and overlapping ports are serialized. Dynamic ports
+  such as `ports: [80]` can run in parallel because Docker chooses an ephemeral host port.
+- `--unique-compose-project` is an advanced escape hatch for fixtures that have explicit image names
+  or generated image-only Compose files. Do not enable it for the normal XBOW sweep unless you have
+  confirmed the target starts with `--no-build`.
+- Claude cells can share the `pentestgpt-claude` volume. Codex cells default to `--max-codex 1`
+  because ChatGPT OAuth refresh tokens rotate; only pass `--max-codex 0` with auth that is safe under
+  concurrent refresh.
+- Resumability keys completed rows on `(benchmark_id, combo, variant, attempt)`. Infra/auth/liveness
+  rows remain in the JSONL log for diagnosis but do not block a later retry of the same cell.
 
 ### Why this satisfies the security constraint
 
-Endpoint-security on the host watches the host's own endpoints/processes. With targets on an
-`--internal` bridge and **no published host ports**, the scan/exploit packets are confined to the
-Docker bridge — they never appear on `127.0.0.1` or a host NIC, so the host EDR doesn't observe
-benchmark scanning. For *full* process-level isolation as well, run the whole stack on a **dedicated
-benchmarking VM/host** (no corporate EDR), which the Docker design ports to unchanged.
+Endpoint-security on the host watches the host's own endpoints/processes. With the tool container
+attacking the target's internal Docker-network URL, scan/exploit packets stay on the Docker bridge
+instead of being directed at `127.0.0.1`. The original fixture may still expose a host port for
+health checks or manual debugging, but the benchmark traffic is container-to-container. For stricter
+network isolation, the next hardening step is generated image-only/no-host-port Compose; for full
+process isolation, run the whole stack on a dedicated benchmarking VM/host with no endpoint monitor.
 
-### Incremental path (lowest effort first)
+### Incremental path
 
-1. **VM-first (zero code).** Run the existing host `run_pilot.py` on a dedicated throwaway VM/cloud
-   box with `DOCKER_DEFAULT_PLATFORM=linux/amd64`. Solves both monitoring and arch immediately;
-   good enough to get the full table.
-2. **Containerize the agent** (`benchmark/docker/Dockerfile.agent`) and switch the harness to
-   internal-network + no-published-ports + connect-agent-container. Portable and reproducible.
-3. **One-command sweep** (`benchmark/docker/run.sh` / compose) bundling build of the agent image,
-   the loop over all 59 challenges × 4 models, and report generation — runnable on a CI box.
+1. **Use the current Docker-network runner.** Start with a two-target smoke at `--concurrency 2`.
+   Scale to the 10-target baseline matrix, then the medium/hard sweep.
+2. **Add a Makefile wrapper.** Wrap the runner, standard output paths, `PILOT_COMBOS`, `--attempts`,
+   `--concurrency`, and `--max-codex` into a documented `make docker-bench` command.
+3. **Generate image-only/no-host-port Compose only if needed.** This is useful for same-benchmark
+   concurrent combos or stricter network isolation, but it is not required for the current
+   benchmark-level parallelism.
+4. **Run on a dedicated benchmark host/VM for large sweeps.** This keeps Docker Desktop resource
+   pressure and local endpoint-security noise out of the measurement.
 
 ### Caveats
 
@@ -324,8 +412,8 @@ benchmarking VM/host** (no corporate EDR), which the Docker design ports to unch
 - Emulated amd64 targets are slower → raise timeouts; size concurrency for the host
   (each slot ≈ one agent container + one target stack).
 
-**Estimated effort:** path 1 ≈ minutes (just a VM); path 2 ≈ half a day (agent image + ~40 lines of
-network wiring in the harness); path 3 ≈ another half day (packaging + a clean full-sweep run).
+**Near-term implementation effort:** the runner is already in place. Remaining engineering work is
+mostly wrapper/report ergonomics plus optional generated no-host-port Compose for stricter isolation.
 
 > **Full development plan** (image build, the hard part — persistent Claude **and** Codex login so you
 > install + log in once and never again — networking, Make targets, phased milestones):

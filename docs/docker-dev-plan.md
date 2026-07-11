@@ -299,7 +299,7 @@ works in-container before any large benchmark run. The full Docker-network sweep
 - **Phase 0 — Recon (done in this plan).** Auth layouts, login mechanisms, current Docker assets, gaps.
 - **Phase 1 — Image.** Extend `Dockerfile`: codex CLI + `openai_codex` + `unified_agent`/
   `pentestgpt_agent`/`benchmark` + scanners + docker CLI + amd64 default. ✔ `docker build` succeeds;
-  `claude --version`, `codex --version`, `uv run pentestgpt --help`, `python -c "import openai_codex"`.
+  `claude --version`, `codex --version`, `uv run pentestgpt-agent --help`, `python -c "import pentestgpt_agent"`.
 - **Phase 2 — Dual-auth persistence (core).** Add `codex-config` volume; write `make docker-login`
   (claude `setup-token` + codex seed/login) and `make docker-auth-status`; entrypoint preflight.
   ✔ Login once → `down` → recreate (keep volumes) → `docker-auth-status` green → 1-token round-trips on

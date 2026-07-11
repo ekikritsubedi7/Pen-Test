@@ -44,7 +44,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pentestgpt = "pentestgpt.interface.main:main"
+pentestgpt-agent = "pentestgpt_agent.__main__:main"
 pentestgpt-legacy = "pentestgpt_legacy.main:main"
 pentestgpt-legacy-connection = "pentestgpt_legacy.test_connection:test_connection"
 
@@ -57,7 +57,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["pentestgpt", "pentestgpt_legacy", "unified_agent", "pentestgpt_agent"]
+packages = ["pentestgpt_legacy", "unified_agent", "pentestgpt_agent"]
 
 # ============================================================================
 # uv Configuration

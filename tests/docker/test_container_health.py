@@ -150,13 +150,14 @@ class TestContainerHealth:
         assert result.returncode == 0
         assert "sudo" in result.stdout, "sudo should be installed"
 
-    def test_pentestgpt_importable(self, running_container: str):
-        """Test that pentestgpt package is importable."""
+    def test_agent_packages_importable(self, running_container: str):
+        """Test that maintained agent packages are importable."""
         result = self._exec_in_container(
-            running_container, "python3 -c 'import pentestgpt; print(\"ok\")'"
+            running_container,
+            "python3 -c 'import pentestgpt_agent, unified_agent; print(\"ok\")'",
         )
         assert result.returncode == 0, f"Import failed: {result.stderr}"
-        assert "ok" in result.stdout, "pentestgpt should be importable"
+        assert "ok" in result.stdout, "agent packages should be importable"
 
     def test_claude_code_available(self, running_container: str):
         """Test that Claude Code CLI is available."""

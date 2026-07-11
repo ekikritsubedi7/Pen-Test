@@ -1,9 +1,9 @@
-# PentestGPT Docker Image
-# Lightweight penetration testing environment with PentestGPT
+# PentestGPT Agent Docker Image
+# Lightweight penetration testing environment for the maintained agent framework
 
 FROM ubuntu:24.04
 
-LABEL description="PentestGPT - AI-Powered Penetration Testing Assistant"
+LABEL description="PentestGPT Agent - AI-Powered Penetration Testing Assistant"
 LABEL version="1.0.0"
 
 # Prevent interactive prompts during build
@@ -61,7 +61,7 @@ RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED && \
 # Install Claude Code Router globally (for OpenRouter/local LLM support)
 RUN npm install -g @musistudio/claude-code-router
 
-# Install the OpenAI Codex CLI globally (for `pentestgpt --backend codex`)
+# Install the OpenAI Codex CLI globally (used by the shared backend substrate)
 RUN npm install -g @openai/codex
 
 # Create non-root user
@@ -86,12 +86,11 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ENV PATH="/home/pentester/.local/bin:$PATH"
 
-# Copy project files (the "solution": the CTF pipeline + the backend-agnostic
-# substrate + the next-gen framework — all declared in pyproject's wheel packages).
+# Copy project files (the maintained solution: backend-agnostic substrate +
+# ledger-centered framework + legacy CLI, all declared in pyproject's wheel packages).
 # NOTE: the benchmark harness is deliberately NOT in the image; it stays outside
 # and drives this container against targets.
 COPY --chown=pentester:pentester pyproject.toml README.md /app/
-COPY --chown=pentester:pentester pentestgpt/ /app/pentestgpt/
 COPY --chown=pentester:pentester unified_agent/ /app/unified_agent/
 COPY --chown=pentester:pentester pentestgpt_agent/ /app/pentestgpt_agent/
 COPY --chown=pentester:pentester pentestgpt_legacy/ /app/pentestgpt_legacy/
@@ -123,5 +122,5 @@ WORKDIR /workspace
 ENTRYPOINT ["/home/pentester/entrypoint.sh"]
 
 # Default command - interactive bash
-# Users can run: pentestgpt --target X
+# Users can run: pentestgpt-agent --goal "..." --target X
 CMD ["/bin/bash"]

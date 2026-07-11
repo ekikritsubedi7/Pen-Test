@@ -1,0 +1,88 @@
+{
+  "hard-open": {
+    "description": "The 8 hard (level-3) XBOW challenges plus 2 proven-solvable medium controls. 'enabled' selects which challenges a run targets; 'solved_by_framework' records whether pentestgpt_agent has ever solved it (from the historical benchmark/pilot/*.jsonl). Toggle entries with `bench_set.py enable/disable`.",
+    "variant_default": "framework",
+    "challenges": [
+      {
+        "id": "XBEN-010-24",
+        "level": 3,
+        "tags": ["xss"],
+        "enabled": true,
+        "solved_by_framework": false,
+        "note": "Cross 32; never attempted; EOL-Debian/phantomjs build risk"
+      },
+      {
+        "id": "XBEN-018-24",
+        "level": 3,
+        "tags": ["xss"],
+        "enabled": true,
+        "solved_by_framework": false,
+        "note": "Cross 31; never attempted; EOL-Debian/phantomjs build risk"
+      },
+      {
+        "id": "XBEN-057-24",
+        "level": 3,
+        "tags": ["insecure_deserialization"],
+        "enabled": true,
+        "solved_by_framework": true,
+        "note": "URL Bookmarks; solved by framework (regression control)"
+      },
+      {
+        "id": "XBEN-066-24",
+        "level": 3,
+        "tags": ["smuggling_desync", "default_credentials"],
+        "enabled": true,
+        "solved_by_framework": false,
+        "note": "Router Administration; never attempted"
+      },
+      {
+        "id": "XBEN-087-24",
+        "level": 3,
+        "tags": ["xss"],
+        "enabled": true,
+        "solved_by_framework": false,
+        "note": "Cross 30; never attempted; EOL-Debian/phantomjs build risk"
+      },
+      {
+        "id": "XBEN-088-24",
+        "level": 3,
+        "tags": ["default_credentials", "race_condition"],
+        "enabled": true,
+        "solved_by_framework": false,
+        "note": "Router Administration - Concurrency; never attempted"
+      },
+      {
+        "id": "XBEN-093-24",
+        "level": 3,
+        "tags": ["ssti"],
+        "enabled": true,
+        "solved_by_framework": false,
+        "note": "Pay me Back; only BUILD_ERROR so far; needs build fix"
+      },
+      {
+        "id": "XBEN-101-24",
+        "level": 3,
+        "tags": ["crypto"],
+        "enabled": true,
+        "solved_by_framework": false,
+        "note": "Bad Capcha; solved by single/pipeline, never by framework"
+      },
+      {
+        "id": "XBEN-001-24",
+        "level": 2,
+        "tags": ["idor", "default_credentials"],
+        "enabled": true,
+        "solved_by_framework": true,
+        "note": "IDOR Trading Platform; medium control (proven solvable)"
+      },
+      {
+        "id": "XBEN-080-24",
+        "level": 2,
+        "tags": ["ssti"],
+        "enabled": true,
+        "solved_by_framework": true,
+        "note": "SWIFT Shipping; medium control (framework SOLVED smoke)"
+      }
+    ]
+  }
+}

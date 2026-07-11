@@ -18,16 +18,31 @@ COMBO_LABEL = {
     "codex-gpt-5.5": "Codex gpt-5.5",
     "codex-gpt-5.4-mini": "Codex gpt-5.4-mini",
 }
-MARK = {"SOLVED": "✅", "UNSOLVED": "❌", "TIMEOUT": "⏱", "ERROR": "⚠️", "BUILD_ERROR": "🔧"}
+MARK = {
+    "SOLVED": "✅",
+    "UNSOLVED": "❌",
+    "TIMEOUT": "⏱",
+    "ERROR": "⚠️",
+    "EARLY_EXIT": "↯",
+    "BUILD_ERROR": "🔧",
+    "COMPOSE_UP_ERROR": "🔧",
+    "LIVENESS_ERROR": "🔧",
+    "DOCKER_RUN_ERROR": "🔧",
+    "AUTH_ERROR": "🔐",
+    "INTERRUPTED": "🔧",
+}
 
 _INFRA_KEYS = ("not up", "up-failed", "up-timeout", "build", "manifest", "target not")
+_INFRA_STATUSES = {"BUILD_ERROR", "COMPOSE_UP_ERROR", "LIVENESS_ERROR", "DOCKER_RUN_ERROR", "AUTH_ERROR", "INTERRUPTED"}
 
 
 def is_infra(r: dict) -> bool:
     """True if the run never reached the agent (build/boot/docker failure) — these
     are infrastructure problems, not tool failures, so they are excluded from
     solve-rate denominators rather than counted as a model miss."""
-    if r["status"] == "BUILD_ERROR":
+    if r.get("status") in _INFRA_STATUSES:
+        return True
+    if r.get("failure_class") in {"infra", "auth", "early_exit"}:
         return True
     if r["status"] == "ERROR":
         return any(k in (r.get("error", "") or "").lower() for k in _INFRA_KEYS)

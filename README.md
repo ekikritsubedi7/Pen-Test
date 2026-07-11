@@ -260,14 +260,66 @@ baseline with the pure single-agent baseline and the current `pentestgpt_agent` 
 The earlier host-loopback pilot remains in [`benchmark/pilot/REPORT.md`](benchmark/pilot/REPORT.md)
 for historical comparison. The reusable Docker-network runner is
 [`benchmark/pilot/run_docker_bench.py`](benchmark/pilot/run_docker_bench.py); it supports
-`single`, `pipeline`, and `framework` variants. Remaining benchmark work is the full 59-target
-medium/hard sweep, adding a Makefile wrapper, retries/best-of-k, and cost normalization. The
-productized wrapper should expose a conservative `JOBS`/`--jobs` setting:
-start with `2`, move to `4` only after a small matrix is clean, and keep each benchmark job in its own
-tool container with a unique target stack, workspace, and log. Codex parallelism needs separate care
-because ChatGPT OAuth refresh tokens can race when multiple jobs share one auth volume; see
+`single`, `pipeline`, and `framework` variants.
+
+Quick Docker-network smoke:
+
+```bash
+make docker-build
+make docker-login
+
+cd benchmark/pilot
+PILOT_COMBOS="claude-sonnet" uv run python run_docker_bench.py \
+  --variant pipeline \
+  --benchmarks XBEN-001-24,XBEN-068-24 \
+  --timeout 900 \
+  --concurrency 2 \
+  --out docker_parallel_smoke.jsonl
+```
+
+Run the next-gen `pentestgpt_agent` framework under the same harness:
+
+```bash
+make docker-bench-agent-quick
+```
+
+Run the full final best-of-three comparison:
+
+```bash
+make docker-bench-bestof3
+```
+
+That command runs a framework canary, then fresh `single`, `pipeline`, and `framework` sweeps over
+the 10-target suite with three attempts per cell. It writes timestamped JSONL files plus
+`benchmark/pilot/DOCKER_BEST_OF_3_<run-id>.md`. If infra/auth/liveness rows leave cells incomplete,
+rerun with the same `BOF3_RUN_ID` to fill retryable attempts.
+
+The Docker runner is host-driven: it builds each XBOW fixture if needed, starts the target with
+Docker Compose, discovers the target container's internal Docker-network URL, runs one fresh
+`pentestgpt:latest` tool container on that network, writes one JSONL row, and tears the target down.
+It now defaults to each fixture's normal Compose project name because XBOW images are pre-built under
+those names. `--concurrency N` parallelizes across distinct benchmarks while model combos remain
+serial inside each benchmark; `docker compose up` uses `--no-build` and Docker preflight fails fast if
+the daemon or tool image is unavailable. Fixed host `ports:` are automatically serialized when they
+overlap. Codex cells default to `--max-codex 1` because shared ChatGPT OAuth refresh tokens can race;
+only use `--max-codex 0` with auth that is safe to refresh concurrently.
+
+Remaining benchmark work is the full 59-target medium/hard sweep and cost normalization. Start real
+sweeps at `--concurrency 2`, move to `4` only after a small matrix is clean, and use
+`make docker-bench-bestof3` for the final 10-target best-of-three comparison. See
 [`benchmark/pilot/README.md`](benchmark/pilot/README.md) and
 [`docs/docker-dev-plan.md`](docs/docker-dev-plan.md).
+
+`make docker-bench-agent-quick` is the default local verification after changing `pentestgpt_agent/`.
+It runs Claude Sonnet on the known framework-smoke target `XBEN-080-24`, mounts the current checkout
+into the tool container with `--source-root`, uses framework executor concurrency `2`, appends a
+timestamped attempt so it does not skip stale rows, and writes
+`benchmark/pilot/docker_framework_quick.jsonl`. Override with Make variables for broader checks, for
+example:
+
+```bash
+make docker-bench-agent-quick AGENT_BENCH_TARGETS=XBEN-001-24,XBEN-068-24 AGENT_BENCH_CONCURRENCY=2 AGENT_BENCH_TIMEOUT=2400
+```
 
 ---
 
