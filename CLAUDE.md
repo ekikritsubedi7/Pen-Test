@@ -4,62 +4,76 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## Project Overview
 
-PentestGPT now centers on `pentestgpt_agent`, a ledger-based autonomous security
-assessment framework. It runs three cooperating roles:
+PentestGPT now centers on **`pentestgpt_agent_new/`**, a durable, memory-backed
+penetration-testing loop. It is a self-contained nested uv project (its own
+`pyproject.toml`, `uv.lock`, and `.venv`) and is the single maintained framework.
 
-- **Instructor** plans scoped work and decides when the assessment can complete.
-- **Executor** performs bounded task cards in a workspace.
-- **Judge** validates evidence and accepts or rejects proposed findings.
+It runs two cooperating LLM roles over a deterministic core:
 
-The old fixed-stage `pentestgpt/` package and `pentestgpt` CLI were retired from
-the active codebase. Historical benchmark reports and JSONL files may still
-mention the old `pipeline` variant; new benchmark runs use only `single` and
-`framework`.
+- **Supervisor** — read-only; proposes at most one new task and leases at most
+  one ready task per decision. It never executes tools.
+- **Executor** — performs only the one leased task, bounded by an explicit task
+  kind and per-kind turn budget.
 
-**Stack:** Python 3.12+, uv, Docker, Claude Code CLI, OpenAI Codex CLI.
-`unified_agent/` remains the shared backend substrate that lets
-`pentestgpt_agent/` drive Claude Code or Codex through one normalized interface.
-Do not delete `unified_agent/` unless you first migrate those imports into
-`pentestgpt_agent/`.
+Deterministic code (not the model) owns scope, task/dependency rules, leases,
+returned-trace identity, evidence provenance, retry safety, and canonical state
+transitions. Every episode is fresh; provider conversation history is not memory.
 
-## Common Commands
+The previous ledger-based `pentestgpt_agent/` framework (Instructor/Executor/Judge)
+and the older fixed-stage `pentestgpt/` package were **removed**. Do not revive
+imports from either. Historical benchmark reports may still mention the retired
+`pipeline`/ledger `framework` variants.
+
+**Stack:** Python 3.12+, uv, Docker, Claude Code CLI, OpenAI Codex CLI. The
+framework drives Claude Code or Codex through the external **`unified-agent`**
+package, consumed as a pinned **git dependency** from
+`github.com/PentestGPT-Project/UnifedAgentWrapper` (the renamed former
+`UnifiedAgentPoC`). A vendored `unified_agent/` copy still lives at the repo root
+for `pentestgpt_legacy` and the parent build; the new framework does **not** use
+it — `test_dependency.py` guards against the vendored copy shadowing the git one.
+
+## Where to work
+
+Almost all framework work happens **inside `pentestgpt_agent_new/`**. Run its uv
+commands from that directory:
 
 ```bash
-# Setup
-uv sync
-
-# Local framework run
-uv run pentestgpt-agent \
-  --goal "Capture the CTF flag for this authorized target" \
-  --target http://127.0.0.1:8000
-
-# Testing
-make test
-uv run pytest tests/test_framework_loop.py tests/test_roles.py -q
-
-# Code quality
-make lint
-make format
-make typecheck
-make check
-
-# Docker
-make docker-build
-make docker-login
-make docker-auth-status
-make docker-run TARGET=http://host.docker.internal:8000 BACKEND=claude
-make docker-bench-agent-quick
-make docker-bench-bestof3
+cd pentestgpt_agent_new
+uv sync --extra claude          # or --extra codex / --extra all
+uv run pentestgpt-agent-new --goal "Capture the CTF flag for this authorized target" \
+  --target http://127.0.0.1:8000 --backend claude
+uv run pentestgpt-agent-audit --help
+uv run pytest -q
+uv run ruff check src tests && uv run ruff format --check src tests && uv run mypy src
 ```
 
-`make docker-run` invokes `pentestgpt-agent` inside the tool image. Override
-`GOAL=...`, `BACKEND=claude|codex`, and `MODEL=...` as needed.
+See `pentestgpt_agent_new/README.md` and `pentestgpt_agent_new/CONTEXT.md` for
+the domain language, invariants, and CLI/audit usage.
+
+## Common Commands (from the repo root)
+
+The top-level Makefile is the umbrella dev interface. Quality/test targets now
+run the nested framework's own gate so it is actually covered:
+
+```bash
+# Run the framework against an authorized target (delegates to the nested CLI)
+make run TARGET=http://127.0.0.1:8000 BACKEND=claude
+
+# Tests / quality
+make test              # parent substrate + benchmark-harness tests
+make test-agent-new    # the nested framework suite
+make check             # parent lint + the full nested gate (ruff, format, mypy, pytest)
+make check-agent-new   # just the nested gate
+make ci                # full CI simulation across both
+```
 
 ## Docker Auth
 
-The Docker image contains the maintained framework, `unified_agent`, the legacy
-CLI, pentest tools, Claude Code CLI, and Codex CLI. The benchmark harness stays
-outside the image and drives one fresh tool container per benchmark cell.
+The Docker image contains the substrate, the legacy CLI, pentest tools, Claude
+Code CLI, and Codex CLI. **The maintained framework is not baked into the image
+yet** — running `pentestgpt_agent_new` in-container is a pending rewire (see the
+Benchmarking note). The benchmark harness stays outside the image and drives one
+fresh tool container per benchmark cell.
 
 Auth persists in named volumes:
 
@@ -73,125 +87,74 @@ auth mode is explicitly safe for concurrent refresh.
 
 ## Architecture
 
-### `pentestgpt_agent/`
+### `pentestgpt_agent_new/src/pentestgpt_agent_new/`
 
-- `contracts.py` — frozen dataclasses and strict schemas for `TaskCard`,
-  `EvidenceBundle`, `FindingProposal`, `JudgeVerdict`, and `NodeStatus`.
-- `scope.py` — derives advisory scope from the target and gates task cards and
-  findings before they are accepted.
-- `ledger.py` — single-writer durable run state under `runs/<run_id>/`:
-  `scope.json`, `ledger.json`, `events.jsonl`, artifacts, and `report.md`.
-- `framework_loop.py` — bounded orchestration loop. It plans when no work is
-  open, dispatches ready leaves concurrently, folds evidence sequentially, and
-  requires judge acceptance for findings and completion.
-- `roles.py` — real role factories and `run_framework()`.
-- `report.py` — renders reports from judge-accepted findings only.
-- `__main__.py` — CLI entry point. Use `python -m pentestgpt_agent` or the
-  `pentestgpt-agent` console script.
-- `loop.py` — older minimal round-based loop kept for compatibility tests.
+- `agents.py` — Supervisor/Executor roles, prompts, schemas, and output parsing.
+- `plan.py` — typed task language and the deterministic plan compiler (scope,
+  single-new-task, and dependency rules).
+- `execution.py` — Executor delta validation and exact, receipt-grounded
+  trace-evidence resolution (a completed task must cite captured evidence).
+- `memory.py` — single-writer SQLite kernel: schema, snapshots, leases, and
+  atomic commits with optimistic revision checks.
+- `trace.py` — durable append-only episode inputs/events/outputs, hashes,
+  usage/cost, plus the `EpisodeRunner`.
+- `loop.py` — crash-resumable one-task-at-a-time loop; recovers persisted traces
+  before re-invoking the model and records deterministic failure transactions.
+- `trial.py` — real-provider trial CLI (`pentestgpt-agent-new`).
+- `audit.py` — deterministic state/trace/oracle audit CLI (`pentestgpt-agent-audit`).
+- `scripts/run_xbow.py` — the framework's own XBOW Docker benchmark runner.
 
-### `unified_agent/`
+### `unified_agent/` (repo-root, vendored)
 
-Shared backend substrate used by `pentestgpt_agent`:
-
-- `agent.py` — `UnifiedAgent` / `SuperAgent` wrapper.
-- `backends/claude_code.py` and `backends/codex.py` — backend adapters.
-- `events.py`, `task.py`, `types.py` — normalized task/result/event types.
-- `tools.py`, `tool_server.py`, `skills.py` — MCP-style tool and skill helpers.
-
-This package is active, not dead code.
+Backend substrate retained for `pentestgpt_legacy` and the parent build. The new
+framework consumes the equivalent package from the git wrapper instead. Do not
+delete this copy without first checking `pentestgpt_legacy` and the parent
+`pyproject.toml` wheel packages.
 
 ### `pentestgpt_legacy/`
 
-The classic USENIX-2024 human-in-the-loop PentestGPT implementation, modernized
-with a native multi-provider LLM layer. CLI scripts:
-
-- `pentestgpt-legacy`
-- `pentestgpt-legacy-connection`
-
-Keep this separate from `pentestgpt_agent`; it is retained for historical and
-interactive workflows.
+The classic USENIX-2024 human-in-the-loop PentestGPT, modernized with a native
+multi-provider LLM layer. CLI scripts: `pentestgpt-legacy`,
+`pentestgpt-legacy-connection`. Retained for historical and interactive workflows.
 
 ## Testing
 
-Suite layout:
-
-- `tests/test_*.py` — framework and `unified_agent` unit tests.
-- `tests/legacy/` — legacy package tests.
-- `tests/docker/` — Docker build/container checks.
-- `tests/smoke/` — live E2E tests, skipped unless explicitly enabled.
-
-Useful focused checks:
-
-```bash
-uv run pytest tests/test_framework_loop.py tests/test_roles.py tests/test_report.py -q
-uv run pytest tests/test_docker_bench_framework_score.py tests/test_best_of_report.py -q
-uv run ruff check pentestgpt_agent/ unified_agent/ pentestgpt_legacy/ tests/
-uv run mypy pentestgpt_agent/
-```
-
-Live smoke:
-
-```bash
-PENTESTGPT_LIVE_SMOKE=1 uv run pytest tests/smoke/test_live_framework_loop.py -v
-```
+- Nested framework: `cd pentestgpt_agent_new && uv run pytest -q` (its `tests/`
+  cover the plan compiler, memory kernel, evidence, trace recovery, the loop,
+  local benchmark, CLIs, and an opt-in live-provider test).
+- Parent repo `tests/`: the vendored `unified_agent` substrate and the
+  benchmark-harness tests. Note the vendored `test_claude_backend.py` /
+  `test_codex_backend.py` can fail on backend-SDK drift independent of framework
+  work; the git-sourced framework suite is the source of truth for the loop.
 
 ## Benchmarking
 
-The active XBOW Docker-network harness lives in `benchmark/pilot/`.
-
-- `run_docker_bench.py --variant single` runs a naive single Claude/Codex agent
-  against the target with a one-shot CTF prompt embedded in the benchmark runner.
-- `run_docker_bench.py --variant framework` runs `python3 -m pentestgpt_agent`
-  and scores stdout plus judge-accepted ledger/report findings.
-- The retired `pipeline` variant is no longer generated by the active runner.
-  Historical `pipeline` rows remain parseable by report tools for old result
-  comparisons.
-
-Parallel policy:
-
-- Use default Compose project names for distinct benchmarks.
-- Do not require `--unique-compose-project` for normal parallel runs.
-- The runner uses `docker compose up --no-build` to avoid unintended rebuilds.
-- Combos stay serial inside a benchmark; `--concurrency N` parallelizes across
-  distinct benchmarks.
-- Start real sweeps at `--concurrency 2`; move to `4` only after a small matrix
-  is clean.
-
-Default local verification after editing `pentestgpt_agent/`:
-
-```bash
-make docker-bench-agent-quick
-```
-
-Default best-of-three comparison after the old pipeline retirement:
-
-```bash
-make docker-bench-bestof3
-```
-
-This runs canaries, then `single` and `framework` sweeps over the configured
-targets. Rerun with the same `BOF3_RUN_ID` to fill retryable infra/auth/provider
-network rows.
+The XBOW Docker-network harness lives in `benchmark/pilot/`. **Benchmarks are
+currently deprioritized.** The harness plus the Dockerfile still target the old
+in-image framework, so the `--variant framework` path and the Docker-bench
+Makefile targets need a rewire onto `pentestgpt_agent_new` (or its own
+`scripts/run_xbow.py`) before they produce valid framework rows again. The
+`--variant single` naive baseline is unaffected.
 
 ## Repository Structure
 
 ```text
 .
-├── pentestgpt_agent/     # Maintained ledger-centered framework
-├── unified_agent/        # Active backend-agnostic substrate for Claude/Codex
-├── pentestgpt_legacy/    # Modernized classic interactive PentestGPT
-├── benchmark/pilot/      # XBOW Docker-network benchmark harness and reports
-├── tests/                # Framework, substrate, legacy, Docker, and smoke tests
-├── Dockerfile            # Tool image for local runs and benchmarks
-└── Makefile              # Development, Docker, and benchmark commands
+├── pentestgpt_agent_new/  # Maintained framework (nested uv project)
+├── unified_agent/         # Vendored substrate for legacy + parent build
+├── pentestgpt_legacy/     # Modernized classic interactive PentestGPT
+├── benchmark/pilot/       # XBOW Docker-network benchmark harness (framework path pending rewire)
+├── tests/                 # Substrate, benchmark-harness, and Docker tests
+├── Dockerfile             # Tool image (substrate + legacy; framework not baked in yet)
+└── Makefile               # Dev/quality umbrella over the nested framework
 ```
 
 ## Modification Requirements
 
-- Keep the maintained path (`pentestgpt_agent` + `unified_agent`) green.
+- Keep the maintained path (`pentestgpt_agent_new` + the git `unified-agent`) green:
+  `make check` must pass.
 - Preserve existing user changes in the worktree.
-- Do not revive imports from the retired `pentestgpt/` package.
+- Do not revive imports from the removed `pentestgpt_agent/` or `pentestgpt/`.
+- When bumping the `unified-agent` pin, update `[tool.uv.sources]` in
+  `pentestgpt_agent_new/pyproject.toml`, run `uv lock`, and re-run the suite.
 - Add focused tests for benchmark harness behavior before long live sweeps.
-- Score framework benchmark results through judge-accepted findings/reports, not
-  raw executor tool output.

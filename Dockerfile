@@ -86,13 +86,15 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ENV PATH="/home/pentester/.local/bin:$PATH"
 
-# Copy project files (the maintained solution: backend-agnostic substrate +
-# ledger-centered framework + legacy CLI, all declared in pyproject's wheel packages).
+# Copy project files (backend-agnostic substrate + legacy CLI, declared in
+# pyproject's wheel packages).
 # NOTE: the benchmark harness is deliberately NOT in the image; it stays outside
 # and drives this container against targets.
+# NOTE: the maintained framework now lives in the nested pentestgpt_agent_new
+# project (its own uv env + git-sourced unified-agent) and is not yet baked into
+# this image; in-container benchmarking of it is a pending rewire (deprioritized).
 COPY --chown=pentester:pentester pyproject.toml README.md /app/
 COPY --chown=pentester:pentester unified_agent/ /app/unified_agent/
-COPY --chown=pentester:pentester pentestgpt_agent/ /app/pentestgpt_agent/
 COPY --chown=pentester:pentester pentestgpt_legacy/ /app/pentestgpt_legacy/
 COPY --chown=pentester:pentester scripts/entrypoint.sh /home/pentester/entrypoint.sh
 COPY --chown=pentester:pentester scripts/docker-auth-status.sh /home/pentester/docker-auth-status.sh
@@ -122,5 +124,6 @@ WORKDIR /workspace
 ENTRYPOINT ["/home/pentester/entrypoint.sh"]
 
 # Default command - interactive bash
-# Users can run: pentestgpt-agent --goal "..." --target X
+# (The maintained pentestgpt_agent_new framework is not baked into this image
+# yet; see the COPY note above. The container ships the tools + substrate.)
 CMD ["/bin/bash"]

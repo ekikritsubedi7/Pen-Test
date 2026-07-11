@@ -6,59 +6,50 @@ files unless the user explicitly asks.
 
 ## Project Map
 
-- `pentestgpt_agent/` is the maintained ledger-centered framework:
-  instructor, executor, judge, accepted findings, durable ledger, and generated
-  report.
-- `unified_agent/` is active shared infrastructure for Claude Code and Codex.
-  `pentestgpt_agent` imports it directly; do not delete it without a deliberate
-  migration.
+- `pentestgpt_agent_new/` is the maintained framework: a self-contained nested
+  uv project running a Supervisor (read-only planner) and an Executor over a
+  deterministic SQLite-backed, crash-resumable loop. Work inside it and run its
+  uv commands from that directory. See its `README.md` / `CONTEXT.md`.
+- `unified_agent/` (repo root) is a vendored substrate copy for `pentestgpt_legacy`
+  and the parent build. The new framework instead consumes the equivalent
+  `unified-agent` package as a pinned **git dependency** from
+  `github.com/PentestGPT-Project/UnifedAgentWrapper` (renamed former
+  `UnifiedAgentPoC`). Do not delete the vendored copy without a deliberate check.
 - `pentestgpt_legacy/` is the modernized interactive legacy tool.
-- `benchmark/pilot/` is the XBOW benchmark workspace and source of truth for
-  Docker-network benchmark commands, JSONL outputs, and reports.
-- The old fixed-stage `pentestgpt/` package and `pentestgpt` CLI have been
-  retired from the active codebase. Historical JSONL/report files may still
-  mention the old `pipeline` variant.
+- `benchmark/pilot/` is the XBOW benchmark workspace for Docker-network commands,
+  JSONL outputs, and reports.
+- The prior ledger-centered `pentestgpt_agent/` (instructor/executor/judge) and
+  the old fixed-stage `pentestgpt/` package have been **removed**. Historical
+  JSONL/report files may still mention the retired `pipeline`/ledger variants.
 
 ## Common Commands
 
+Framework work happens inside the nested project:
+
 ```bash
-uv sync
-make lint
-make typecheck
-uv run pytest tests/test_framework_loop.py tests/test_roles.py -q
-uv run pytest tests/test_docker_bench_framework_score.py tests/test_best_of_report.py -q
+cd pentestgpt_agent_new
+uv sync --extra claude
+uv run pentestgpt-agent-new --goal "Capture the CTF flag for this authorized target" \
+  --target http://127.0.0.1:8000 --backend claude
+uv run pentestgpt-agent-audit --help
+uv run pytest -q && uv run ruff check src tests && uv run mypy src
 ```
 
-Docker image and auth setup:
+From the repo root, the umbrella Makefile covers the nested framework:
+
+```bash
+make run TARGET=http://127.0.0.1:8000 BACKEND=claude
+make check           # parent lint + nested ruff/format/mypy/pytest
+make test-agent-new  # nested suite only
+```
+
+Docker image and auth setup (note: the framework is not baked into the image yet):
 
 ```bash
 make docker-build
 make docker-login
 make docker-auth-status
 ```
-
-Run the maintained framework locally:
-
-```bash
-uv run pentestgpt-agent \
-  --goal "Capture the CTF flag for this authorized target" \
-  --target http://127.0.0.1:8000
-```
-
-Default local verification after editing `pentestgpt_agent/`:
-
-```bash
-make docker-bench-agent-quick
-```
-
-Default best-of-three comparison:
-
-```bash
-make docker-bench-bestof3
-```
-
-This now runs canaries plus `single` and `framework` sweeps. It no longer runs
-the retired fixed-stage `pipeline` variant.
 
 ## Docker Benchmark Rules
 
@@ -101,17 +92,10 @@ PILOT_COMBOS="claude-sonnet" uv run python run_docker_bench.py \
   --out docker_single_smoke.jsonl
 ```
 
-Maintained framework smoke:
-
-```bash
-make docker-bench-agent-quick
-```
-
-Best-of-three comparison:
-
-```bash
-make docker-bench-bestof3
-```
+Framework smoke and best-of-three (`make docker-bench-agent-quick` /
+`make docker-bench-bestof3`) currently target the removed in-image framework and
+are **pending a rewire** onto `pentestgpt_agent_new` (benchmarks deprioritized).
+The naive `--variant single` path above is unaffected.
 
 ## Safety
 
@@ -125,8 +109,8 @@ HTTPS to their providers.
 
 - Keep documentation and benchmark commands in sync when runner behavior changes.
 - Preserve existing user changes in the worktree.
-- Do not reintroduce imports from the retired `pentestgpt/` package.
+- Do not reintroduce imports from the removed `pentestgpt_agent/` or `pentestgpt/`.
 - Add or update focused tests for benchmark runner behavior before long live
   sweeps.
-- For `pentestgpt_agent`, score through judge-accepted reports/ledger findings,
-  not raw executor tool output.
+- For the framework, evidence is validated against the durable episode trace
+  (exact, receipt-grounded), not raw executor stdout.
