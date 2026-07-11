@@ -90,7 +90,7 @@ ENV PATH="/home/pentester/.local/bin:$PATH"
 # pyproject's wheel packages).
 # NOTE: the benchmark harness is deliberately NOT in the image; it stays outside
 # and drives this container against targets.
-# NOTE: the maintained framework now lives in the nested pentestgpt_agent_new
+# NOTE: the maintained framework now lives in the nested pentestgpt_agent
 # project (its own uv env + git-sourced unified-agent) and is not yet baked into
 # this image; in-container benchmarking of it is a pending rewire (deprioritized).
 COPY --chown=pentester:pentester pyproject.toml README.md /app/
@@ -124,6 +124,6 @@ WORKDIR /workspace
 ENTRYPOINT ["/home/pentester/entrypoint.sh"]
 
 # Default command - interactive bash
-# (The maintained pentestgpt_agent_new framework is not baked into this image
+# (The maintained pentestgpt_agent framework is not baked into this image
 # yet; see the COPY note above. The container ships the tools + substrate.)
 CMD ["/bin/bash"]

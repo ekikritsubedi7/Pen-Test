@@ -68,17 +68,17 @@ test-fast:
 test-backend:
 	uv run pytest tests/test_claude_backend.py tests/test_codex_backend.py -v
 
-# The maintained framework lives in the nested pentestgpt_agent_new project (its
+# The maintained framework lives in the nested pentestgpt_agent project (its
 # own uv env + git-sourced unified-agent). Run its gate from here so the
 # top-level `make check`/`make ci` actually cover it.
 test-agent-new:
-	cd pentestgpt_agent_new && uv run pytest -q
+	cd pentestgpt_agent && uv run pytest -q
 
 check-agent-new:
-	cd pentestgpt_agent_new && uv run ruff check src tests
-	cd pentestgpt_agent_new && uv run ruff format --check src tests
-	cd pentestgpt_agent_new && uv run mypy src
-	cd pentestgpt_agent_new && uv run pytest -q
+	cd pentestgpt_agent && uv run ruff check src tests
+	cd pentestgpt_agent && uv run ruff format --check src tests
+	cd pentestgpt_agent && uv run mypy src
+	cd pentestgpt_agent && uv run pytest -q
 
 # ============================================================================
 # Code Quality
@@ -97,7 +97,7 @@ format-check:
 	uv run ruff format --check unified_agent/ pentestgpt_legacy/ tests/
 
 typecheck:
-	cd pentestgpt_agent_new && uv run mypy src
+	cd pentestgpt_agent && uv run mypy src
 
 # Parent-package lint + the full nested framework gate (ruff, format, mypy, tests).
 check: lint check-agent-new
@@ -120,11 +120,11 @@ ci:
 	uv run ruff format --check unified_agent/ pentestgpt_legacy/ tests/
 	@echo ""
 	@echo "[3/5] Type check (mypy)..."
-	cd pentestgpt_agent_new && uv run mypy src
+	cd pentestgpt_agent && uv run mypy src
 	@echo ""
 	@echo "[4/5] Running tests (parent substrate + nested framework)..."
 	uv run pytest tests/ -v
-	cd pentestgpt_agent_new && uv run pytest -q
+	cd pentestgpt_agent && uv run pytest -q
 	@echo ""
 	@echo "[5/5] Building package..."
 	uv build
@@ -146,11 +146,11 @@ ci-quick:
 	uv run ruff format --check unified_agent/ pentestgpt_legacy/ tests/
 	@echo ""
 	@echo "[3/4] Type check (mypy)..."
-	cd pentestgpt_agent_new && uv run mypy src
+	cd pentestgpt_agent && uv run mypy src
 	@echo ""
 	@echo "[4/4] Running tests (parent substrate + nested framework)..."
 	uv run pytest tests/ -v
-	cd pentestgpt_agent_new && uv run pytest -q
+	cd pentestgpt_agent && uv run pytest -q
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick CI simulation completed successfully!"
@@ -182,7 +182,7 @@ clean:
 # Run the maintained framework locally against an authorized target.
 run:
 	@test -n "$(TARGET)" || (echo "Set TARGET=... (e.g. http://127.0.0.1:8000)"; exit 1)
-	cd pentestgpt_agent_new && uv run pentestgpt-agent-new --goal "$(or $(GOAL),Assess the target for exploitable vulnerabilities and capture any CTF flag.)" --target "$(TARGET)" --backend "$(BACKEND)" $(if $(MODEL),--model "$(MODEL)",)
+	cd pentestgpt_agent && uv run pentestgpt-agent --goal "$(or $(GOAL),Assess the target for exploitable vulnerabilities and capture any CTF flag.)" --target "$(TARGET)" --backend "$(BACKEND)" $(if $(MODEL),--model "$(MODEL)",)
 
 # Watch for changes and run tests
 watch:

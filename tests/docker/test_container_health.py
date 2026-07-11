@@ -153,7 +153,7 @@ class TestContainerHealth:
     def test_agent_packages_importable(self, running_container: str):
         """Test that the substrate packages baked into the image are importable.
 
-        The maintained framework (pentestgpt_agent_new) is not baked into this
+        The maintained framework (pentestgpt_agent) is not baked into this
         image yet (see Dockerfile), so only the substrate + legacy CLI ship here.
         """
         result = self._exec_in_container(
