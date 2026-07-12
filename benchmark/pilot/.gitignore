@@ -1,5 +1,0 @@
-# Transient run artifacts (keep run_pilot.py, report.py, README.md, REPORT.md, results.jsonl)
-logs/
-pilot_run.out
-selected.json
-__pycache__/

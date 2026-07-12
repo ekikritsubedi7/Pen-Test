@@ -5,8 +5,6 @@
 .PHONY: check check-agent-new test-agent-new run
 .PHONY: ci ci-quick
 .PHONY: docker-build docker-login docker-auth-status docker-shell docker-run docker-down docker-nuke
-.PHONY: docker-bench-agent-quick bench-agent-quick docker-bench-bestof3 bench-bestof3
-.PHONY: docker-bench-set bench-set docker-bench-set-list bench-set-list
 
 # Default target
 help:
@@ -34,9 +32,8 @@ help:
 	@echo "  make docker-shell        Interactive shell in the tool container"
 	@echo "  make docker-nuke         Remove login volumes (forces re-login)"
 	@echo ""
-	@echo "Benchmarks:"
-	@echo "  make docker-bench-agent-quick   Default local pentestgpt_agent benchmark smoke"
-	@echo "  make docker-bench-bestof3       Full best-of-three single/framework benchmark"
+	@echo "Benchmarks moved to the sibling ../xbow-benchmark repo:"
+	@echo "  make -C ../xbow-benchmark help   (uses the pentestgpt:latest image built here)"
 
 # ============================================================================
 # Setup
@@ -203,64 +200,6 @@ BACKEND ?= claude
 MODEL   ?=
 GOAL    ?= Capture the CTF flag for this authorized benchmark target.
 
-# Default local verification for pentestgpt_agent changes.
-# Override knobs:
-#   AGENT_BENCH_TARGETS=XBEN-080-24
-#   AGENT_BENCH_COMBOS=claude-sonnet
-#   AGENT_BENCH_CONCURRENCY=1
-#   AGENT_BENCH_EXECUTOR_CONCURRENCY=2
-#   AGENT_BENCH_TIMEOUT=1200
-AGENT_BENCH_TARGETS              ?= XBEN-080-24
-AGENT_BENCH_COMBOS               ?= claude-sonnet
-AGENT_BENCH_CONCURRENCY          ?= 1
-AGENT_BENCH_EXECUTOR_CONCURRENCY ?= 2
-AGENT_BENCH_TIMEOUT              ?= 1200
-AGENT_BENCH_ATTEMPT              ?= $(shell date +%Y%m%d%H%M%S)
-AGENT_BENCH_ATTEMPTS             ?= 1
-AGENT_BENCH_MAX_CODEX            ?= 1
-AGENT_BENCH_OUT                  ?= docker_framework_quick.jsonl
-
-# Final best-of-three comparison suite.
-# Override knobs:
-#   BOF3_RUN_ID=20260629_190000
-#   BOF3_SKIP_CANARY=1
-#   BOF3_DRY_RUN=1
-BOF3_RUN_ID                         ?= $(shell date +%Y%m%d_%H%M%S)
-BOF3_BENCHMARKS                     ?= XBEN-001-24,XBEN-030-24,XBEN-057-24,XBEN-068-24,XBEN-075-24,XBEN-079-24,XBEN-080-24,XBEN-082-24,XBEN-097-24,XBEN-101-24
-BOF3_COMBOS                         ?= claude-opus,claude-sonnet,codex-gpt-5.5,codex-gpt-5.4-mini
-BOF3_TIMEOUT                        ?= 2400
-BOF3_CONCURRENCY                    ?= 2
-BOF3_MAX_CODEX                      ?= 1
-BOF3_ATTEMPT                        ?= 1
-BOF3_ATTEMPTS                       ?= 3
-BOF3_FRAMEWORK_EXECUTOR_CONCURRENCY ?= 2
-BOF3_SOURCE_ROOT                    ?= ../..
-BOF3_CANARY_BENCHMARKS              ?= XBEN-068-24,XBEN-080-24
-BOF3_CANARY_SINGLE_COMBOS           ?= claude-sonnet,codex-gpt-5.5
-BOF3_CANARY_FRAMEWORK_COMBOS        ?= claude-sonnet
-BOF3_CANARY_TIMEOUT                 ?= 1200
-BOF3_SKIP_CANARY_FLAG               = $(if $(filter 1 true yes,$(BOF3_SKIP_CANARY)),--skip-canary,)
-BOF3_DRY_RUN_FLAG                   = $(if $(filter 1 true yes,$(BOF3_DRY_RUN)),--dry-run,)
-
-# Toggleable named benchmark sets (benchmark/pilot/benchmark_sets.json).
-# `bench_set.py` runs only the challenges whose `enabled` flag is on, and
-# auto-picks parallelism unless BENCH_SET_CONCURRENCY is a number.
-# Override knobs:
-#   BENCH_SET=hard-open BENCH_SET_VARIANT=framework|single|both
-#   BENCH_SET_CONCURRENCY=auto|N  BENCH_SET_COMBOS=claude-sonnet
-#   BENCH_SET_DRY_RUN=1
-BENCH_SET                ?= hard-open
-BENCH_SET_VARIANT        ?= framework
-BENCH_SET_CONCURRENCY    ?= auto
-BENCH_SET_COMBOS         ?= claude-opus,claude-sonnet,codex-gpt-5.5,codex-gpt-5.4-mini
-BENCH_SET_TIMEOUT        ?= 2400
-BENCH_SET_ATTEMPT        ?= 1
-BENCH_SET_ATTEMPTS       ?= 1
-BENCH_SET_MAX_CODEX      ?= 1
-BENCH_SET_EXECUTOR_CONCURRENCY ?= 2
-BENCH_SET_XBEN_ROOT      ?= /Users/gelei/papers/cochise/xbow-benchmarks/benchmarks
-BENCH_SET_DRY_RUN_FLAG   = $(if $(filter 1 true yes,$(BENCH_SET_DRY_RUN)),--dry-run,)
-
 # Build the tool image
 docker-build:
 	docker build -t $(DOCKER_IMAGE) .
@@ -285,78 +224,6 @@ docker-run:
 	docker run --rm $(DOCKER_RUN_MOUNTS) -e PENTESTGPT_AUTH_MODE=manual \
 		$(DOCKER_IMAGE) pentestgpt-agent --goal "$(GOAL)" --target "$(TARGET)" \
 		--backend "$(BACKEND)" $(if $(MODEL),--model "$(MODEL)",)
-
-# Default local benchmark smoke for pentestgpt_agent development.
-# Assumes `make docker-build` and `make docker-login` have already succeeded.
-docker-bench-agent-quick:
-	@echo "Running pentestgpt_agent quick benchmark:"
-	@echo "  targets=$(AGENT_BENCH_TARGETS)"
-	@echo "  combos=$(AGENT_BENCH_COMBOS)"
-	@echo "  attempt=$(AGENT_BENCH_ATTEMPT)"
-	@echo "  concurrency=$(AGENT_BENCH_CONCURRENCY), executor_concurrency=$(AGENT_BENCH_EXECUTOR_CONCURRENCY)"
-	cd benchmark/pilot && PILOT_COMBOS="$(AGENT_BENCH_COMBOS)" uv run python run_docker_bench.py \
-		--variant framework \
-		--image "$(DOCKER_IMAGE)" \
-		--source-root ../.. \
-		--benchmarks "$(AGENT_BENCH_TARGETS)" \
-		--timeout "$(AGENT_BENCH_TIMEOUT)" \
-		--concurrency "$(AGENT_BENCH_CONCURRENCY)" \
-		--framework-executor-concurrency "$(AGENT_BENCH_EXECUTOR_CONCURRENCY)" \
-		--attempt "$(AGENT_BENCH_ATTEMPT)" \
-		--attempts "$(AGENT_BENCH_ATTEMPTS)" \
-		--max-codex "$(AGENT_BENCH_MAX_CODEX)" \
-		--out "$(AGENT_BENCH_OUT)"
-	@echo "Results: benchmark/pilot/$(AGENT_BENCH_OUT)"
-
-bench-agent-quick: docker-bench-agent-quick
-
-# Full final comparison: single-agent vs pentestgpt_agent.
-# Produces timestamped docker_bof3_<run-id>_*.jsonl files and
-# DOCKER_BEST_OF_3_<run-id>.md under benchmark/pilot/.
-docker-bench-bestof3:
-	cd benchmark/pilot && uv run python run_bestof3_suite.py \
-		--run-id "$(BOF3_RUN_ID)" \
-		--image "$(DOCKER_IMAGE)" \
-		--source-root "$(BOF3_SOURCE_ROOT)" \
-		--benchmarks "$(BOF3_BENCHMARKS)" \
-		--combos "$(BOF3_COMBOS)" \
-		--timeout "$(BOF3_TIMEOUT)" \
-		--concurrency "$(BOF3_CONCURRENCY)" \
-		--max-codex "$(BOF3_MAX_CODEX)" \
-		--attempt "$(BOF3_ATTEMPT)" \
-		--attempts "$(BOF3_ATTEMPTS)" \
-		--framework-executor-concurrency "$(BOF3_FRAMEWORK_EXECUTOR_CONCURRENCY)" \
-		--canary-benchmarks "$(BOF3_CANARY_BENCHMARKS)" \
-		--canary-single-combos "$(BOF3_CANARY_SINGLE_COMBOS)" \
-		--canary-framework-combos "$(BOF3_CANARY_FRAMEWORK_COMBOS)" \
-		--canary-timeout "$(BOF3_CANARY_TIMEOUT)" $(BOF3_SKIP_CANARY_FLAG) $(BOF3_DRY_RUN_FLAG)
-
-bench-bestof3: docker-bench-bestof3
-
-# Show a toggleable benchmark set and its on/off state.
-docker-bench-set-list:
-	cd benchmark/pilot && uv run python bench_set.py list --set "$(BENCH_SET)"
-
-bench-set-list: docker-bench-set-list
-
-# Run only the ENABLED challenges of a named set. Docker (build -> up ->
-# discover -> run tool image -> score -> teardown) happens inside the runner.
-# BENCH_SET_CONCURRENCY=auto lets the tool suggest parallelism; pass a number to fix it.
-docker-bench-set:
-	cd benchmark/pilot && XBEN_ROOT="$(BENCH_SET_XBEN_ROOT)" uv run python bench_set.py run \
-		--set "$(BENCH_SET)" \
-		--variant "$(BENCH_SET_VARIANT)" \
-		--concurrency "$(BENCH_SET_CONCURRENCY)" \
-		--combos "$(BENCH_SET_COMBOS)" \
-		--image "$(DOCKER_IMAGE)" \
-		--source-root ../.. \
-		--timeout "$(BENCH_SET_TIMEOUT)" \
-		--attempt "$(BENCH_SET_ATTEMPT)" \
-		--attempts "$(BENCH_SET_ATTEMPTS)" \
-		--max-codex "$(BENCH_SET_MAX_CODEX)" \
-		--framework-executor-concurrency "$(BENCH_SET_EXECUTOR_CONCURRENCY)" $(BENCH_SET_DRY_RUN_FLAG)
-
-bench-set: docker-bench-set
 
 # Stop/remove the compose container but KEEP the login volumes (stay logged in)
 docker-down:
