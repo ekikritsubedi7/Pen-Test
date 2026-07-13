@@ -1,9 +1,9 @@
-# PentestGPT Agent Docker Image
-# Lightweight penetration testing environment for the maintained agent framework
+# PentestGPT tool image
+# Disposable pentest environment and provider CLIs; the nested framework is installed separately.
 
 FROM ubuntu:24.04
 
-LABEL description="PentestGPT Agent - AI-Powered Penetration Testing Assistant"
+LABEL description="PentestGPT disposable pentest tool and provider-CLI environment"
 LABEL version="1.0.0"
 
 # Prevent interactive prompts during build
@@ -86,8 +86,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ENV PATH="/home/pentester/.local/bin:$PATH"
 
-# Copy project files (backend-agnostic substrate + legacy CLI, declared in
-# pyproject's wheel packages).
+# Copy root compatibility substrate + legacy CLI, declared in the root wheel.
 # NOTE: the benchmark harness is deliberately NOT in the image; it stays outside
 # and drives this container against targets.
 # NOTE: the maintained framework now lives in the nested pentestgpt_agent

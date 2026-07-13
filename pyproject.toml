@@ -30,13 +30,15 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     "python-dotenv>=1.0.0",
     "langfuse>=2.0.0",
-    # Modernized legacy PentestGPT: interactive UI + native multi-provider LLM SDKs
+    # Modernized legacy PentestGPT: interactive UI + native multi-provider LLM SDKs.
     "prompt-toolkit>=3.0.0",
     "rich>=13.0.0",
     "loguru>=0.7.0",
     "openai>=1.55.0",
     "anthropic>=0.49.0",
     "google-genai>=1.0.0",
+    # Transitional dependencies of the obsolete root unified_agent compatibility copy.
+    # The maintained framework resolves unified-agent from UnifedAgentWrapper instead.
     "claude-agent-sdk>=0.2.90",
     "openai-codex>=0.1.0b3",
     "mcp>=1.23.0",
@@ -142,6 +144,7 @@ asyncio_mode = "auto"
 markers = [
     "unit: Unit tests (fast, no external dependencies)",
     "integration: Integration tests (may use mocks)",
+    "docker: requires a local Docker daemon and may build or start containers",
     "slow: Slow tests (skip with -m 'not slow')",
     "live: Live smoke tests that require backend auth and may spend tokens",
 ]

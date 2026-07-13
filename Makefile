@@ -1,8 +1,9 @@
 # PentestGPT Makefile
 # Usage: make [target]
 
-.PHONY: help install test test-cov test-verbose lint format typecheck clean build
-.PHONY: check check-agent-new test-agent-new run
+.PHONY: help install test test-all test-cov test-verbose test-fast test-backend
+.PHONY: lint lint-fix format format-check typecheck clean build watch
+.PHONY: check check-agent test-agent check-agent-new test-agent-new run
 .PHONY: ci ci-quick
 .PHONY: docker-build docker-login docker-auth-status docker-shell docker-run docker-down docker-nuke
 
@@ -12,14 +13,15 @@ help:
 	@echo "==================="
 	@echo ""
 	@echo "Setup:"
-	@echo "  make install     Install dependencies (uv sync)"
+	@echo "  make install     Install root + agent dependencies (AGENT_EXTRA=all)"
 	@echo ""
 	@echo "Development:"
-	@echo "  make test         Run all tests"
+	@echo "  make test         Run root non-Docker tests + maintained-agent tests"
+	@echo "  make test-all     Also run Docker contract tests"
 	@echo "  make lint         Run linter (ruff)"
 	@echo "  make format       Format code (ruff)"
 	@echo "  make typecheck    Run type checker (mypy)"
-	@echo "  make check        Run all checks (lint + typecheck)"
+	@echo "  make check        Run lint, format, typecheck, and agent tests"
 	@echo "  make ci           Run full CI simulation (lint, format, typecheck, test, build)"
 	@echo "  make ci-quick     Run quick CI (skip build step)"
 	@echo "  make clean        Clean build artifacts"
@@ -28,7 +30,7 @@ help:
 	@echo "  make docker-build        Build the tool image"
 	@echo "  make docker-login        ONE-TIME: log in to Claude + Codex (persists to volumes)"
 	@echo "  make docker-auth-status  Check both CLIs are logged in (ROUNDTRIP=1 for live check)"
-	@echo "  make docker-run TARGET=… BACKEND=… MODEL=… GOAL=…   Run the framework against a target"
+	@echo "  make docker-run        Pending: framework is not baked into the image yet"
 	@echo "  make docker-shell        Interactive shell in the tool container"
 	@echo "  make docker-nuke         Remove login volumes (forces re-login)"
 	@echo ""
@@ -39,43 +41,50 @@ help:
 # Setup
 # ============================================================================
 
+AGENT_EXTRA ?= all
+
 install:
 	uv sync
+	cd pentestgpt_agent && uv sync --extra $(AGENT_EXTRA)
 
 # ============================================================================
 # Testing
 # ============================================================================
 
-test:
-	uv run pytest tests/ -v
+test: test-agent
+	uv run python -m pytest tests/ -v --ignore=tests/docker/
 
-test-all:
-	uv run pytest tests/ -v
+test-all: test-agent
+	uv run python -m pytest tests/ -v
 
 test-cov:
-	uv run pytest tests/ -v --cov=unified_agent --cov-report=term-missing --cov-report=html
+	uv run python -m pytest tests/ -v --cov=unified_agent --cov-report=term-missing --cov-report=html
 
 test-verbose:
-	uv run pytest tests/ -vvs
+	uv run python -m pytest tests/ -vvs
 
 # Test by category
 test-fast:
-	uv run pytest tests/ -v -m "not slow"
+	uv run python -m pytest tests/ -v -m "not slow"
 
 test-backend:
-	uv run pytest tests/test_claude_backend.py tests/test_codex_backend.py -v
+	uv run python -m pytest tests/test_claude_backend.py tests/test_codex_backend.py -v
 
 # The maintained framework lives in the nested pentestgpt_agent project (its
 # own uv env + git-sourced unified-agent). Run its gate from here so the
 # top-level `make check`/`make ci` actually cover it.
-test-agent-new:
-	cd pentestgpt_agent && uv run pytest -q
+test-agent:
+	cd pentestgpt_agent && uv run python -m pytest -q
 
-check-agent-new:
+check-agent:
 	cd pentestgpt_agent && uv run ruff check src tests
 	cd pentestgpt_agent && uv run ruff format --check src tests
 	cd pentestgpt_agent && uv run mypy src
-	cd pentestgpt_agent && uv run pytest -q
+	cd pentestgpt_agent && uv run python -m pytest -q
+
+# Compatibility aliases for scripts written before the package rename.
+test-agent-new: test-agent
+check-agent-new: check-agent
 
 # ============================================================================
 # Code Quality
@@ -96,62 +105,25 @@ format-check:
 typecheck:
 	cd pentestgpt_agent && uv run mypy src
 
-# Parent-package lint + the full nested framework gate (ruff, format, mypy, tests).
-check: lint check-agent-new
+# Parent-package lint/format + the full nested framework gate (ruff, format, mypy, tests).
+check: lint format-check check-agent
 	@echo "All checks passed!"
 
 # ============================================================================
 # CI Simulation (End-to-End)
 # ============================================================================
 
-# Full CI simulation - mirrors GitHub Actions workflow exactly
-ci:
-	@echo "=========================================="
-	@echo "Running full CI simulation..."
-	@echo "=========================================="
-	@echo ""
-	@echo "[1/5] Lint check (ruff check)..."
-	uv run ruff check unified_agent/ pentestgpt_legacy/ tests/
-	@echo ""
-	@echo "[2/5] Format check (ruff format --check)..."
-	uv run ruff format --check unified_agent/ pentestgpt_legacy/ tests/
-	@echo ""
-	@echo "[3/5] Type check (mypy)..."
-	cd pentestgpt_agent && uv run mypy src
-	@echo ""
-	@echo "[4/5] Running tests (parent substrate + nested framework)..."
-	uv run pytest tests/ -v
-	cd pentestgpt_agent && uv run pytest -q
-	@echo ""
-	@echo "[5/5] Building package..."
+# Full CI simulation. Docker has its own CI job and is intentionally excluded here.
+ci: check
+	uv run python -m pytest tests/ -q --ignore=tests/docker/
 	uv build
-	@echo ""
-	@echo "=========================================="
+	cd pentestgpt_agent && uv build
 	@echo "CI simulation completed successfully!"
-	@echo "=========================================="
 
-# Quick CI - skip build step (faster iteration)
-ci-quick:
-	@echo "=========================================="
-	@echo "Running quick CI simulation..."
-	@echo "=========================================="
-	@echo ""
-	@echo "[1/4] Lint check (ruff check)..."
-	uv run ruff check unified_agent/ pentestgpt_legacy/ tests/
-	@echo ""
-	@echo "[2/4] Format check (ruff format --check)..."
-	uv run ruff format --check unified_agent/ pentestgpt_legacy/ tests/
-	@echo ""
-	@echo "[3/4] Type check (mypy)..."
-	cd pentestgpt_agent && uv run mypy src
-	@echo ""
-	@echo "[4/4] Running tests (parent substrate + nested framework)..."
-	uv run pytest tests/ -v
-	cd pentestgpt_agent && uv run pytest -q
-	@echo ""
-	@echo "=========================================="
+# Quick CI skips package builds.
+ci-quick: check
+	uv run python -m pytest tests/ -q --ignore=tests/docker/
 	@echo "Quick CI simulation completed successfully!"
-	@echo "=========================================="
 
 # ============================================================================
 # Build
@@ -217,13 +189,12 @@ docker-auth-status:
 docker-shell:
 	docker run -it --rm $(DOCKER_RUN_MOUNTS) -e PENTESTGPT_AUTH_MODE=manual $(DOCKER_IMAGE)
 
-# Run the framework against a target:
-#   make docker-run TARGET=http://127.0.0.1:8000 BACKEND=codex MODEL=gpt-5.5
+# The image currently omits the nested framework. Keep this target as an explicit
+# diagnostic instead of failing later with an opaque "command not found".
 docker-run:
-	@test -n "$(TARGET)" || (echo "Set TARGET=... (e.g. http://host:port)"; exit 1)
-	docker run --rm $(DOCKER_RUN_MOUNTS) -e PENTESTGPT_AUTH_MODE=manual \
-		$(DOCKER_IMAGE) pentestgpt-agent --goal "$(GOAL)" --target "$(TARGET)" \
-		--backend "$(BACKEND)" $(if $(MODEL),--model "$(MODEL)",)
+	@echo "pentestgpt_agent is not baked into $(DOCKER_IMAGE) yet."
+	@echo "Use 'make run TARGET=...' locally or the temporary isolated qualification runner."
+	@exit 2
 
 # Stop/remove the compose container but KEEP the login volumes (stay logged in)
 docker-down:

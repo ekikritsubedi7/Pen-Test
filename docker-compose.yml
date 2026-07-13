@@ -46,7 +46,7 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
 
 volumes:
-  # Explicit names so `make docker-login` / `make docker-run` and compose share the
+  # Explicit names so Docker login/status/shell commands and compose share the
   # same persistent login volumes regardless of the compose project name.
   claude-config:
     name: pentestgpt-claude

@@ -1,119 +1,79 @@
-# AGENT.md
+# Agent guide
 
-Codex-facing working notes for this repository. Keep this aligned with
-`CLAUDE.md` when benchmark or agent architecture changes. Do not edit README
-files unless the user explicitly asks.
+Internal instructions for coding agents in this repository. Read
+[`docs/architecture.md`](docs/architecture.md) before architecture work. The root `README.md` is the
+public project page and must not be edited unless the user explicitly requests that separate review.
 
-## Project Map
+## Active project map
 
-- `pentestgpt_agent/` is the maintained framework: a self-contained nested
-  uv project running a Supervisor (read-only planner) and an Executor over a
-  deterministic SQLite-backed, crash-resumable loop. Work inside it and run its
-  uv commands from that directory. See its `README.md` / `CONTEXT.md`.
-- `unified_agent/` (repo root) is a vendored substrate copy for `pentestgpt_legacy`
-  and the parent build. The new framework instead consumes the equivalent
-  `unified-agent` package as a pinned **git dependency** from
-  `github.com/PentestGPT-Project/UnifedAgentWrapper` (renamed former
-  `UnifiedAgentPoC`). Do not delete the vendored copy without a deliberate check.
-- `pentestgpt_legacy/` is the modernized interactive legacy tool.
-- `benchmark/pilot/` is the XBOW benchmark workspace for Docker-network commands,
-  JSONL outputs, and reports.
-- This framework **reclaimed the `pentestgpt_agent` name** from an unrelated
-  earlier design: the prior ledger-centered instructor/executor/judge
-  implementation at this path was removed and replaced. The old fixed-stage
-  `pentestgpt/` package was also removed. Historical JSONL/report files may still
-  mention the retired `pipeline`/ledger variants.
+- `pentestgpt_agent/` — maintained autonomous Supervisor/Executor framework; nested uv project.
+- `pentestgpt_legacy/` — maintained human-driven USEN-2024-style client.
+- `../UnifedAgentWrapper/` — canonical `unified-agent` package used by the framework.
+- `../xbow-benchmark/` — benchmark harness and results; owned by a separate repository.
+- `unified_agent/` — obsolete compatibility copy retained by root packaging/Docker only. Do not add
+  features here or confuse it with the framework dependency.
 
-## Common Commands
+The old fixed-stage `pentestgpt/` package and the previous ledger-centered
+Instructor/Executor/Judge implementation are gone. Historical reports may still name them.
 
-Framework work happens inside the nested project:
+## Runtime contract
+
+- The Supervisor and Executor both use `SandboxPolicy.FULL_ACCESS`; deployment isolation is the
+  security boundary.
+- Each episode is fresh. SQLite and exact trace receipts—not provider conversation history—are
+  memory.
+- Deterministic code owns scope, plan validation, leases, evidence, retries, completion bases, and
+  revisions.
+- Provider action and file activity is logged but is not an audit failure.
+- Keep the core at two LLM roles. Do not add an always-on judge, RAG layer, or scheduler without
+  trace evidence that the current deterministic seam cannot solve the problem.
+
+## Commands
+
+Framework work runs inside the nested project:
 
 ```bash
 cd pentestgpt_agent
-uv sync --extra claude
-uv run pentestgpt-agent --goal "Capture the CTF flag for this authorized target" \
-  --target http://127.0.0.1:8000 --backend claude
-uv run pentestgpt-agent-audit --help
-uv run pytest -q && uv run ruff check src tests && uv run mypy src
+uv sync --extra claude          # or codex / all
+uv run python -m pytest -q
+uv run ruff check src tests
+uv run ruff format --check src tests
+uv run mypy src
+uv lock --check
+uv build
 ```
 
-From the repo root, the umbrella Makefile covers the nested framework:
+From the repository root:
 
 ```bash
 make run TARGET=http://127.0.0.1:8000 BACKEND=claude
-make check           # parent lint + nested ruff/format/mypy/pytest
-make test-agent-new  # nested suite only
-```
-
-Docker image and auth setup (note: the framework is not baked into the image yet):
-
-```bash
+make check
+make ci
 make docker-build
 make docker-login
 make docker-auth-status
 ```
 
-## Docker Benchmark Rules
+The root Docker image does not currently contain `pentestgpt_agent`; treat `make docker-run` and the
+external framework benchmark path as pending runtime wiring. Benchmark commands belong in
+`../xbow-benchmark`.
 
-Use `benchmark/pilot/run_docker_bench.py` for comparable benchmark results. It is
-host-driven: the runner starts each XBOW target with Docker Compose, discovers
-the target container's internal Docker-network URL, runs one fresh
-`pentestgpt:latest` tool container on that network, appends one JSONL row, and
-tears the target down.
+## Documentation map
 
-Important rules:
+- `docs/architecture.md` — current repository and module decisions.
+- `pentestgpt_agent/CONTEXT.md` — domain language and invariants.
+- `pentestgpt_agent/README.md` — framework development and operation.
+- `docs/docker-dev-plan.md` — current Docker/auth status and known gap.
+- `PENTESTGPT_AGENT_NEW_*` — compact historical migration/qualification records.
+- `pentestgpt_agent/HTB_ENIGMA_QUALIFICATION_20260712.md` — failed remote qualification evidence.
 
-- Keep the scheduler host-driven unless there is a concrete reason to move it.
-  This avoids adding another Docker socket mount failure point.
-- Do not require `--unique-compose-project` for normal parallel runs. XBOW
-  images are pre-built under fixture default project names, and synthetic
-  project names can make Compose look for missing image tags.
-- Use `--concurrency N` to run distinct benchmarks in parallel. Combos stay
-  serial inside one benchmark, so the same default Compose project is not
-  attacked twice at once.
-- Fixed host `ports:` are automatically serialized when they overlap. Dynamic
-  ports such as `ports: [80]` can run in parallel.
-- Codex benchmark cells default to `--max-codex 1` because shared ChatGPT OAuth
-  refresh tokens can race. Only pass `--max-codex 0` when the Codex auth mode is
-  safe under concurrent refresh.
-- Infra/auth/liveness/Docker-run/provider-network/interrupted rows are
-  diagnostic and retryable. They stay in JSONL logs but do not count as completed
-  valid attempts.
+## Editing rules
 
-## Benchmark Smokes
-
-Naive single-agent smoke:
-
-```bash
-cd benchmark/pilot
-PILOT_COMBOS="claude-sonnet" uv run python run_docker_bench.py \
-  --variant single \
-  --benchmarks XBEN-001-24,XBEN-068-24 \
-  --timeout 900 \
-  --concurrency 2 \
-  --out docker_single_smoke.jsonl
-```
-
-Framework smoke and best-of-three (`make docker-bench-agent-quick` /
-`make docker-bench-bestof3`) currently target the removed in-image framework and
-are **pending a rewire** onto `pentestgpt_agent` (benchmarks deprioritized).
-The naive `--variant single` path above is unaffected.
-
-## Safety
-
-The benchmark agents run real offensive tooling against local Docker CTF
-targets. Only run the benchmark where this is authorized and where endpoint
-security monitoring will not interfere with measurements. The Docker-network
-harness attacks internal container URLs, but model CLIs still need outbound
-HTTPS to their providers.
-
-## Editing Expectations
-
-- Keep documentation and benchmark commands in sync when runner behavior changes.
-- Preserve existing user changes in the worktree.
-- Do not reintroduce the retired ledger-based instructor/executor/judge design
-  (the prior occupant of this name) or the old fixed-stage `pentestgpt/` package.
-- Add or update focused tests for benchmark runner behavior before long live
-  sweeps.
-- For the framework, evidence is validated against the durable episode trace
-  (exact, receipt-grounded), not raw executor stdout.
+- Preserve unrelated and concurrent worktree changes. Never restore or modify files merely because
+  they appear as changes you did not create.
+- Do not edit the root public `README.md` during internal documentation cleanup.
+- Do not put benchmark runners or generated result archives back into this repository.
+- Keep application imports as `unified_agent`; change dependency source configuration rather than
+  copying the wrapper into `pentestgpt_agent`.
+- Add focused replay or interface-level tests for behavior changes before live runs.
+- Never expose provider credentials, VPN files, HTB tokens, flags, or raw sensitive traces.
