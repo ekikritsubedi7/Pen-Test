@@ -109,7 +109,7 @@ fi
 
 # Setup complete
 echo -e "${GREEN}═══════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}✓ Setup complete! PentestGPT is ready to use.${NC}"
+echo -e "${GREEN}✓ Setup complete! PentestGPT Agent is ready to use.${NC}"
 echo -e "${GREEN}═══════════════════════════════════════════════════════${NC}\n"
 
 echo -e "${BLUE}Before First Use:${NC}"
@@ -118,34 +118,32 @@ echo -e "     ${PURPLE}docker compose run --rm pentestgpt${NC}\n"
 echo -e "  ${NC}2. Inside the container, configure Claude Code (first time only):${NC}"
 echo -e "     ${PURPLE}claude config${NC}"
 echo -e "     ${NC}(Follow the prompts to add your Anthropic API key)${NC}\n"
-echo -e "  ${NC}3. Run PentestGPT to solve a CTF challenge:${NC}"
-echo -e "     ${PURPLE}pentestgpt --target 10.10.11.234${NC}\n"
+echo -e "  ${NC}3. Run PentestGPT Agent to solve a CTF challenge:${NC}"
+echo -e "     ${PURPLE}pentestgpt-agent --goal \"Capture the CTF flag\" --target 10.10.11.234${NC}\n"
 
 echo -e "${BLUE}Quick Start:${NC}"
 echo -e "  ${NC}# Solve an HTB machine${NC}"
-echo -e "  ${PURPLE}docker compose run --rm pentestgpt --target 10.10.11.234${NC}\n"
+echo -e "  ${PURPLE}docker compose run --rm pentestgpt pentestgpt-agent --goal \"Capture the CTF flag\" --target 10.10.11.234${NC}\n"
 
 echo -e "  ${NC}# Or enter container first (recommended for first-time setup)${NC}"
 echo -e "  ${PURPLE}docker compose run --rm pentestgpt${NC}"
 echo -e "  ${NC}# Then inside container: claude config (first time)${NC}"
-echo -e "  ${NC}# Then: pentestgpt --target 10.10.11.234${NC}\n"
+echo -e "  ${NC}# Then: pentestgpt-agent --goal \"Capture the CTF flag\" --target 10.10.11.234${NC}\n"
 
 echo -e "${BLUE}Options:${NC}"
+echo -e "  ${NC}--goal TEXT${NC}            Assessment goal (required)"
 echo -e "  ${NC}--target TARGET${NC}          Target CTF challenge or machine (required)"
-echo -e "  ${NC}--instruction TEXT${NC}       Custom challenge context or hints"
-echo -e "  ${NC}--non-interactive${NC}        Headless mode (no TUI)\n"
+echo -e "  ${NC}--backend BACKEND${NC}        claude or codex"
+echo -e "  ${NC}--model MODEL${NC}            Backend-native model id\n"
 
 echo -e "${BLUE}Examples:${NC}"
 echo -e "  ${NC}# HTB machine${NC}"
-echo -e "  ${PURPLE}docker compose run --rm pentestgpt --target 10.10.11.100${NC}\n"
+echo -e "  ${PURPLE}docker compose run --rm pentestgpt pentestgpt-agent --goal \"Capture the CTF flag\" --target 10.10.11.100${NC}\n"
 
 echo -e "  ${NC}# Web CTF challenge${NC}"
-echo -e "  ${PURPLE}docker compose run --rm pentestgpt --target https://ctf.example.com/challenge1${NC}\n"
+echo -e "  ${PURPLE}docker compose run --rm pentestgpt pentestgpt-agent --goal \"Capture the CTF flag\" --target https://ctf.example.com/challenge1${NC}\n"
 
 echo -e "  ${NC}# With challenge context${NC}"
-echo -e "  ${PURPLE}docker compose run --rm pentestgpt --target 10.10.11.50 --instruction \"WordPress site, look for plugin vulns\"${NC}\n"
-
-echo -e "  ${NC}# Non-interactive mode${NC}"
-echo -e "  ${PURPLE}docker compose run --rm pentestgpt --target 10.10.11.234 --non-interactive${NC}\n"
+echo -e "  ${PURPLE}docker compose run --rm pentestgpt pentestgpt-agent --goal \"Capture the CTF flag; WordPress site, look for plugin vulns\" --target 10.10.11.50${NC}\n"
 
 echo -e "${GREEN}Happy flag hunting! 🚩${NC}\n"

@@ -7,117 +7,58 @@ on:
     branches: [main]
 
 jobs:
-  lint:
-    name: Lint
+  quality:
+    name: Source, tests, and packages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
+      - name: Install uv and Python
         uses: astral-sh/setup-uv@v4
         with:
-          version: "latest"
+          version: latest
 
-      - name: Set up Python
-        run: uv python install 3.12
+      - run: uv python install 3.12
 
-      - name: Install dependencies
-        run: uv sync
+      - name: Sync root project
+        run: uv sync --locked
 
-      - name: Run ruff check
-        run: uv run ruff check pentestgpt/ tests/
+      - name: Sync maintained agent
+        working-directory: pentestgpt_agent
+        run: uv sync --locked
 
-      - name: Run ruff format check
-        run: uv run ruff format --check pentestgpt/ tests/
+      - name: Run repository checks
+        run: make check
 
-  typecheck:
-    name: Type Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: Run root tests
+        run: uv run python -m pytest tests/ -q --ignore=tests/docker/
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          version: "latest"
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install dependencies
-        run: uv sync
-
-      - name: Run mypy
-        run: uv run mypy pentestgpt/
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          version: "latest"
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install dependencies
-        run: uv sync
-
-      - name: Run tests
-        run: uv run pytest tests/ -v --ignore=tests/docker/
-
-  test-docker:
-    name: Docker Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Validate docker-compose config
-        run: docker compose config
-
-      - name: Build Docker image
-        run: docker compose build
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          version: "latest"
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install dependencies
-        run: uv sync
-
-      - name: Run Docker tests
-        run: uv run pytest tests/docker/ -v -m docker
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          version: "latest"
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Build package
+      - name: Build root package
         run: uv build
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Build maintained agent
+        working-directory: pentestgpt_agent
+        run: uv build
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Compose
+        run: docker compose config
+
+      - name: Build image
+        run: docker build -t pentestgpt:latest .
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@v4
         with:
-          name: dist
-          path: dist/
-          retention-days: 7
+          version: latest
+
+      - run: uv python install 3.12
+      - run: uv sync --locked
+
+      - name: Run Docker contract tests
+        run: uv run python -m pytest tests/docker/ -q -m docker

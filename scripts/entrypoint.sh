@@ -81,6 +81,12 @@ setup_ccr() {
     echo -e "${BLUE}Default model: ${display_model}${NC}"
 }
 
+# Load a persisted Claude OAuth token (created once via `make docker-login`,
+# stored in the claude-config volume) so `claude` authenticates non-interactively.
+if [ -s "$HOME/.claude/oauth_token" ]; then
+    export CLAUDE_CODE_OAUTH_TOKEN="$(cat "$HOME/.claude/oauth_token")"
+fi
+
 echo ""
 echo -e "${BLUE}=== PentestGPT Authentication ===${NC}"
 
@@ -107,8 +113,13 @@ case "$AUTH_MODE" in
         fi
         ;;
     manual)
-        echo -e "${YELLOW}Manual login mode${NC}"
-        echo -e "Run ${GREEN}claude login${NC} to authenticate"
+        echo -e "${GREEN}Subscription / persisted-login mode${NC}"
+        # Non-blocking preflight: report whether the persisted Claude + Codex
+        # sessions are present (set up once via `make docker-login` on the host).
+        if [ -x /home/pentester/docker-auth-status.sh ] && ! /home/pentester/docker-auth-status.sh; then
+            echo -e "${YELLOW}One or both CLIs are not logged in.${NC}"
+            echo -e "Run ${GREEN}make docker-login${NC} on the host once to persist both sessions."
+        fi
         ;;
     *)
         echo -e "${YELLOW}Unknown auth mode: $AUTH_MODE${NC}"

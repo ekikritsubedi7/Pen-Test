@@ -53,13 +53,14 @@
 
 ## What's New in v1.0 (Agentic Upgrade)
 
-- **Iteration Loop** - The agent runs continuously, maintains a context file with progress, and restarts with prior context when hitting limits. Loop terminates on flag capture or max iterations.
-- **Autonomous Agent** - Agentic pipeline for intelligent, autonomous penetration testing
-- **Session Persistence** - Save and resume penetration testing sessions
+- **Multi-Stage Pipeline** - The agent works through staged phases (recon → exploit → walkthrough for CTF; asset discovery → vulnerability identification → report for pentests), feeding each stage's findings into the next.
+- **Autonomous Agent** - Drives Claude Code or Codex to run tools and reason without human intervention.
+- **Session Persistence** - Save and resume penetration testing sessions.
 
-> **Multi-model support** is available today in the interactive **modernized legacy** mode
-> (`pentestgpt-legacy`) — OpenAI, Anthropic, Google Gemini, DeepSeek, xAI, Qwen, Moonshot, and
-> local Ollama. See [Interactive Multi-LLM Mode](#interactive-multi-llm-mode-modernized-legacy).
+> The autonomous CTF pipeline is backend-pluggable for Claude Code and Codex. The interactive
+> **modernized legacy** mode (`pentestgpt-legacy`) supports a wider provider set: OpenAI, Anthropic,
+> Google Gemini, DeepSeek, xAI, Qwen, Moonshot, and local Ollama. See
+> [Interactive Multi-LLM Mode](#interactive-multi-llm-mode-modernized-legacy).
 
 ---
 
@@ -79,7 +80,8 @@
 
 - **Python 3.12+**
 - **[uv](https://docs.astral.sh/uv/)** - Python package manager
-- **Claude Code CLI** (`claude`) - installed and authenticated. See [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code)
+- **Claude Code CLI** (`claude`) - installed and authenticated for local Claude runs. See [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code)
+- **Codex CLI** (`codex`) - installed and authenticated for local Codex runs. The Docker flow below bundles both CLIs.
 
 ### Installation
 
@@ -103,17 +105,41 @@ make install    # runs uv sync
 ## Usage
 
 ```bash
-# Run against a target
+# Run against a target (CTF mode by default)
 pentestgpt --target 10.10.11.234
 
 # With challenge context
 pentestgpt --target 10.10.11.50 --instruction "WordPress site, focus on plugin vulnerabilities"
 
-# Limit iterations
-pentestgpt --target 10.10.11.234 --max-iterations 5
+# Penetration-test mode (asset discovery → vulnerabilities → report)
+pentestgpt --target 10.10.11.234 --mode pentest
+
+# List previously saved sessions
+pentestgpt --list-sessions
 ```
 
-The agent runs in an **iteration loop**: it works autonomously, maintains a context file with progress, and restarts with prior context when hitting limits. The loop terminates on flag capture or max iterations (default: 10).
+The agent works through a **multi-stage pipeline**, feeding each stage's findings into the next — recon → exploit → walkthrough for CTF, asset discovery → vulnerability identification → report for pentest.
+
+### Run in Docker (install once, log in once)
+
+A self-contained image bundles the tool + the Claude Code **and** Codex CLIs. You log in **once** and
+the sessions persist in named volumes — no re-login on later runs.
+
+```bash
+make docker-build        # build the tool image
+make docker-login        # ONE-TIME, idempotent: checks logins, logs in only what's missing
+make docker-auth-status  # check both are logged in (ROUNDTRIP=1 for a live 1-token check)
+
+# Run the pipeline against a target (any backend / model / mode):
+make docker-run TARGET=http://127.0.0.1:8000 BACKEND=codex MODEL=gpt-5.5 MODE=ctf
+make docker-run TARGET=10.10.11.234         BACKEND=claude MODEL=opus    MODE=pentest
+```
+
+`make docker-login` logs in **Claude** (`setup-token` → token stored in the volume) and **Codex** (its
+own in-container `codex login`, OAuth callback forwarded via socat — *not* seeded, since ChatGPT refresh
+tokens are single-use). It is idempotent: re-running skips whatever is still valid. Logins persist across
+container recreation; `make docker-down` keeps them, `make docker-nuke` removes the login volumes (to
+force a fresh login / rotate a token). Design + details: [`docs/docker-dev-plan.md`](docs/docker-dev-plan.md).
 
 ---
 
@@ -122,8 +148,9 @@ The agent runs in an **iteration loop**: it works autonomously, maintains a cont
 The classic, human-in-the-loop PentestGPT from the USENIX 2024 paper is preserved and
 modernized as `pentestgpt-legacy`. It runs three cooperating LLM sessions —
 **reasoning / generation / parsing** — that maintain a **Pentesting Task Tree (PTT)** while you
-drive the session interactively (`next`, `more`, `todo`, `discuss`). Unlike the autonomous agent
-(Claude-only), this mode talks **natively** to many providers via their official SDKs.
+drive the session interactively (`next`, `more`, `todo`, `discuss`). The autonomous fixed-stage
+pipeline supports Claude and Codex backends; this legacy mode talks **natively** to many providers
+via their official SDKs.
 
 ### Configure providers
 
@@ -198,7 +225,8 @@ export LANGFUSE_ENABLED=false
 
 ## Benchmarks
 
-PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW validation suite:
+PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW validation suite
+(single-model, Dec-2025 baseline):
 
 - **Cost**: Average $1.11, Median $0.42 per successful benchmark
 - **Time**: Average 6.1 minutes, Median 3.3 minutes per successful benchmark
@@ -206,6 +234,92 @@ PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW va
   - Level 1: 91.1%
   - Level 2: 74.5%
   - Level 3: 62.5%
+
+### Multi-model benchmarking
+
+The CTF pipeline is backend-pluggable (`--backend {claude,codex}`), enabling head-to-head comparison
+of Claude (`opus`/`sonnet`) and OpenAI Codex (`gpt-5.5`/`gpt-5.4-mini`) on the same challenges.
+
+The current comparable Docker baseline is
+[`benchmark/pilot/DOCKER_REPORT.md`](benchmark/pilot/DOCKER_REPORT.md): 10 representative medium/hard
+xbow targets, four model/runtime combinations, 40 runs total. The tool ran inside
+`pentestgpt:latest`, joined each target's Docker network, and attacked the target container IP
+directly. Raw records are in
+[`benchmark/pilot/docker_results.jsonl`](benchmark/pilot/docker_results.jsonl).
+The companion comparison report,
+[`benchmark/pilot/DOCKER_COMPARISON.md`](benchmark/pilot/DOCKER_COMPARISON.md), joins this pipeline
+baseline with the pure single-agent baseline and the current `pentestgpt_agent` framework smoke row.
+
+| Model | Solved | Solve rate | Avg solved time |
+|---|---:|---:|---:|
+| Codex `gpt-5.5` | 7/10 | 70% | 424s |
+| Claude Sonnet | 6/10 | 60% | 458s |
+| Claude Opus | 5/10 | 50% | 304s |
+| Codex `gpt-5.4-mini` | 3/10 | 30% | 427s |
+
+The earlier host-loopback pilot remains in [`benchmark/pilot/REPORT.md`](benchmark/pilot/REPORT.md)
+for historical comparison. The reusable Docker-network runner is
+[`benchmark/pilot/run_docker_bench.py`](benchmark/pilot/run_docker_bench.py); it supports
+`single`, `pipeline`, and `framework` variants.
+
+Quick Docker-network smoke:
+
+```bash
+make docker-build
+make docker-login
+
+cd benchmark/pilot
+PILOT_COMBOS="claude-sonnet" uv run python run_docker_bench.py \
+  --variant pipeline \
+  --benchmarks XBEN-001-24,XBEN-068-24 \
+  --timeout 900 \
+  --concurrency 2 \
+  --out docker_parallel_smoke.jsonl
+```
+
+Run the next-gen `pentestgpt_agent` framework under the same harness:
+
+```bash
+make docker-bench-agent-quick
+```
+
+Run the full final best-of-three comparison:
+
+```bash
+make docker-bench-bestof3
+```
+
+That command runs a framework canary, then fresh `single`, `pipeline`, and `framework` sweeps over
+the 10-target suite with three attempts per cell. It writes timestamped JSONL files plus
+`benchmark/pilot/DOCKER_BEST_OF_3_<run-id>.md`. If infra/auth/liveness rows leave cells incomplete,
+rerun with the same `BOF3_RUN_ID` to fill retryable attempts.
+
+The Docker runner is host-driven: it builds each XBOW fixture if needed, starts the target with
+Docker Compose, discovers the target container's internal Docker-network URL, runs one fresh
+`pentestgpt:latest` tool container on that network, writes one JSONL row, and tears the target down.
+It now defaults to each fixture's normal Compose project name because XBOW images are pre-built under
+those names. `--concurrency N` parallelizes across distinct benchmarks while model combos remain
+serial inside each benchmark; `docker compose up` uses `--no-build` and Docker preflight fails fast if
+the daemon or tool image is unavailable. Fixed host `ports:` are automatically serialized when they
+overlap. Codex cells default to `--max-codex 1` because shared ChatGPT OAuth refresh tokens can race;
+only use `--max-codex 0` with auth that is safe to refresh concurrently.
+
+Remaining benchmark work is the full 59-target medium/hard sweep and cost normalization. Start real
+sweeps at `--concurrency 2`, move to `4` only after a small matrix is clean, and use
+`make docker-bench-bestof3` for the final 10-target best-of-three comparison. See
+[`benchmark/pilot/README.md`](benchmark/pilot/README.md) and
+[`docs/docker-dev-plan.md`](docs/docker-dev-plan.md).
+
+`make docker-bench-agent-quick` is the default local verification after changing `pentestgpt_agent/`.
+It runs Claude Sonnet on the known framework-smoke target `XBEN-080-24`, mounts the current checkout
+into the tool container with `--source-root`, uses framework executor concurrency `2`, appends a
+timestamped attempt so it does not skip stale rows, and writes
+`benchmark/pilot/docker_framework_quick.jsonl`. Override with Make variables for broader checks, for
+example:
+
+```bash
+make docker-bench-agent-quick AGENT_BENCH_TARGETS=XBEN-001-24,XBEN-068-24 AGENT_BENCH_CONCURRENCY=2 AGENT_BENCH_TIMEOUT=2400
+```
 
 ---
 
