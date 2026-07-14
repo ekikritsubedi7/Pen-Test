@@ -20,20 +20,19 @@ It deliberately excludes benchmark fixtures/results, credentials, workspaces, an
 
 The maintained `pentestgpt_agent` nested project is **not baked into this image**. Consequently,
 `make docker-run` deliberately fails fast with a wiring diagnostic instead of invoking an absent
-CLI. The temporary qualification runner in `pentestgpt_agent/scripts/run_xbow.py` works around this
-by building the framework and external wrapper wheels on the host, then installing those wheels into
-an isolated container environment.
+CLI. There is no product-owned benchmark workaround; framework-image wiring remains an independent
+deployment task.
 
 ## Repository ownership
 
 ```text
 PentestGPT/          image, auth helpers, framework source, legacy client
 UnifedAgentWrapper/  canonical provider-wrapper package
-xbow-benchmark/      Docker-network targets, scheduling, scoring, reports
+xbow-benchmark/      reference-only benchmark harness and historical results
 ```
 
-The benchmark harness no longer belongs under this repository. Run benchmark commands from
-`../xbow-benchmark`; do not add result JSONL or target orchestration here.
+The product does not support or invoke the sibling benchmark harness. Keep result JSONL, target
+orchestration, and benchmark-specific adapters out of this repository.
 
 ## Persistent provider login
 
@@ -89,7 +88,7 @@ There are two reasonable future shapes:
 2. Publish both packages and install pinned releases during the Docker build.
 
 Do not copy the root `unified_agent/` directory into the maintained framework. It is version 0.1-era
-compatibility code; the agent requires the pinned external 0.2 package.
+compatibility code; the agent requires the pinned external 0.3 package.
 
 Whichever shape is selected must make these checks true in a fresh container:
 
@@ -112,13 +111,9 @@ These are independent of framework design:
 - remove the root `unified_agent` copy and its SDK dependencies when the public-package cleanup is
   performed.
 
-## Benchmark handoff
+## External benchmark reference
 
-The sibling benchmark repository is host-driven: it starts each authorized XBOW fixture, attaches a
-fresh tool container to the target network, records one result, and tears the target down. Claude
-jobs may share their token volume; Codex jobs should remain serialized unless refresh-token safety is
-demonstrated.
-
-Its `framework` variant is still pending rewire to the renamed `pentestgpt_agent`. The working wheel
-build/install sequence in `pentestgpt_agent/scripts/run_xbow.py` is the implementation reference for
-that transfer.
+The sibling `xbow-benchmark` repository is retained only for historical reference. The product
+Makefile, CLI, CI, and Docker runtime do not invoke it. If a future evaluation reuses that corpus,
+design the adapter in an external evaluation repository rather than restoring a benchmark runner
+inside PentestGPT.
