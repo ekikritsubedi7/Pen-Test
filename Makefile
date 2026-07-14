@@ -33,9 +33,6 @@ help:
 	@echo "  make docker-run        Pending: framework is not baked into the image yet"
 	@echo "  make docker-shell        Interactive shell in the tool container"
 	@echo "  make docker-nuke         Remove login volumes (forces re-login)"
-	@echo ""
-	@echo "Benchmarks moved to the sibling ../xbow-benchmark repo:"
-	@echo "  make -C ../xbow-benchmark help   (uses the pentestgpt:latest image built here)"
 
 # ============================================================================
 # Setup
@@ -193,7 +190,7 @@ docker-shell:
 # diagnostic instead of failing later with an opaque "command not found".
 docker-run:
 	@echo "pentestgpt_agent is not baked into $(DOCKER_IMAGE) yet."
-	@echo "Use 'make run TARGET=...' locally or the temporary isolated qualification runner."
+	@echo "Use 'make run TARGET=...' locally until a supported framework image is implemented."
 	@exit 2
 
 # Stop/remove the compose container but KEEP the login volumes (stay logged in)
