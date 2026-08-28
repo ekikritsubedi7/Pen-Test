@@ -150,13 +150,18 @@ class TestContainerHealth:
         assert result.returncode == 0
         assert "sudo" in result.stdout, "sudo should be installed"
 
-    def test_pentestgpt_importable(self, running_container: str):
-        """Test that pentestgpt package is importable."""
+    def test_agent_packages_importable(self, running_container: str):
+        """Test that the substrate packages baked into the image are importable.
+
+        The maintained framework (pentestgpt_agent) is not baked into this
+        image yet (see Dockerfile), so only the substrate + legacy CLI ship here.
+        """
         result = self._exec_in_container(
-            running_container, "python3 -c 'import pentestgpt; print(\"ok\")'"
+            running_container,
+            "python3 -c 'import unified_agent, pentestgpt_legacy; print(\"ok\")'",
         )
         assert result.returncode == 0, f"Import failed: {result.stderr}"
-        assert "ok" in result.stdout, "pentestgpt should be importable"
+        assert "ok" in result.stdout, "substrate packages should be importable"
 
     def test_claude_code_available(self, running_container: str):
         """Test that Claude Code CLI is available."""

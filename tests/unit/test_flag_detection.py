@@ -7,7 +7,7 @@ import re
 
 import pytest
 
-# Flag patterns from pentestgpt/core/controller.py
+# Flag patterns retained for compatibility with historical CTF scoring behavior.
 FLAG_PATTERNS = [
     r"flag\{[^\}]+\}",  # flag{...}
     r"FLAG\{[^\}]+\}",  # FLAG{...}

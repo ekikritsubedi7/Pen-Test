@@ -53,13 +53,14 @@
 
 ## What's New in v1.0 (Agentic Upgrade)
 
-- **Iteration Loop** - The agent runs continuously, maintains a context file with progress, and restarts with prior context when hitting limits. Loop terminates on flag capture or max iterations.
-- **Autonomous Agent** - Agentic pipeline for intelligent, autonomous penetration testing
-- **Session Persistence** - Save and resume penetration testing sessions
+- **Multi-Stage Pipeline** - The agent works through staged phases (recon → exploit → walkthrough for CTF; asset discovery → vulnerability identification → report for pentests), feeding each stage's findings into the next.
+- **Autonomous Agent** - Drives Claude Code or Codex to run tools and reason without human intervention.
+- **Session Persistence** - Save and resume penetration testing sessions.
 
-> **Multi-model support** is available today in the interactive **modernized legacy** mode
-> (`pentestgpt-legacy`) — OpenAI, Anthropic, Google Gemini, DeepSeek, xAI, Qwen, Moonshot, and
-> local Ollama. See [Interactive Multi-LLM Mode](#interactive-multi-llm-mode-modernized-legacy).
+> The autonomous CTF pipeline is backend-pluggable for Claude Code and Codex. The interactive
+> **modernized legacy** mode (`pentestgpt-legacy`) supports a wider provider set: OpenAI, Anthropic,
+> Google Gemini, DeepSeek, xAI, Qwen, Moonshot, and local Ollama. See
+> [Interactive Multi-LLM Mode](#interactive-multi-llm-mode-modernized-legacy).
 
 ---
 
@@ -79,7 +80,8 @@
 
 - **Python 3.12+**
 - **[uv](https://docs.astral.sh/uv/)** - Python package manager
-- **Claude Code CLI** (`claude`) - installed and authenticated. See [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code)
+- **Claude Code CLI** (`claude`) - installed and authenticated for local Claude runs. See [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code)
+- **Codex CLI** (`codex`) - installed and authenticated for local Codex runs. The Docker flow below bundles both CLIs.
 
 ### Installation
 
@@ -103,17 +105,41 @@ make install    # runs uv sync
 ## Usage
 
 ```bash
-# Run against a target
+# Run against a target (CTF mode by default)
 pentestgpt --target 10.10.11.234
 
 # With challenge context
 pentestgpt --target 10.10.11.50 --instruction "WordPress site, focus on plugin vulnerabilities"
 
-# Limit iterations
-pentestgpt --target 10.10.11.234 --max-iterations 5
+# Penetration-test mode (asset discovery → vulnerabilities → report)
+pentestgpt --target 10.10.11.234 --mode pentest
+
+# List previously saved sessions
+pentestgpt --list-sessions
 ```
 
-The agent runs in an **iteration loop**: it works autonomously, maintains a context file with progress, and restarts with prior context when hitting limits. The loop terminates on flag capture or max iterations (default: 10).
+The agent works through a **multi-stage pipeline**, feeding each stage's findings into the next — recon → exploit → walkthrough for CTF, asset discovery → vulnerability identification → report for pentest.
+
+### Run in Docker (install once, log in once)
+
+A self-contained image bundles the tool + the Claude Code **and** Codex CLIs. You log in **once** and
+the sessions persist in named volumes — no re-login on later runs.
+
+```bash
+make docker-build        # build the tool image
+make docker-login        # ONE-TIME, idempotent: checks logins, logs in only what's missing
+make docker-auth-status  # check both are logged in (ROUNDTRIP=1 for a live 1-token check)
+
+# Run the pipeline against a target (any backend / model / mode):
+make docker-run TARGET=http://127.0.0.1:8000 BACKEND=codex MODEL=gpt-5.5 MODE=ctf
+make docker-run TARGET=10.10.11.234         BACKEND=claude MODEL=opus    MODE=pentest
+```
+
+`make docker-login` logs in **Claude** (`setup-token` → token stored in the volume) and **Codex** (its
+own in-container `codex login`, OAuth callback forwarded via socat — *not* seeded, since ChatGPT refresh
+tokens are single-use). It is idempotent: re-running skips whatever is still valid. Logins persist across
+container recreation; `make docker-down` keeps them, `make docker-nuke` removes the login volumes (to
+force a fresh login / rotate a token). Design + details: [`docs/docker-dev-plan.md`](docs/docker-dev-plan.md).
 
 ---
 
@@ -122,8 +148,9 @@ The agent runs in an **iteration loop**: it works autonomously, maintains a cont
 The classic, human-in-the-loop PentestGPT from the USENIX 2024 paper is preserved and
 modernized as `pentestgpt-legacy`. It runs three cooperating LLM sessions —
 **reasoning / generation / parsing** — that maintain a **Pentesting Task Tree (PTT)** while you
-drive the session interactively (`next`, `more`, `todo`, `discuss`). Unlike the autonomous agent
-(Claude-only), this mode talks **natively** to many providers via their official SDKs.
+drive the session interactively (`next`, `more`, `todo`, `discuss`). The autonomous fixed-stage
+pipeline supports Claude and Codex backends; this legacy mode talks **natively** to many providers
+via their official SDKs.
 
 ### Configure providers
 
@@ -196,16 +223,16 @@ export LANGFUSE_ENABLED=false
 
 ---
 
-## Benchmarks
+## Benchmark history
 
-PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on the XBOW validation suite:
+PentestGPT achieved an **86.5% success rate** (90/104 benchmarks) on an XBOW validation-suite
+experiment in December 2025. That number is a historical research result, not a current
+`pentestgpt-agent` regression guarantee.
 
-- **Cost**: Average $1.11, Median $0.42 per successful benchmark
-- **Time**: Average 6.1 minutes, Median 3.3 minutes per successful benchmark
-- **Success rates by difficulty**:
-  - Level 1: 91.1%
-  - Level 2: 74.5%
-  - Level 3: 62.5%
+XBOW harnesses and result archives are maintained outside this product repository as reference-only
+research artifacts. The supported PentestGPT CLI, Makefile, CI, and Docker runtime do not expose an
+XBOW runner. A future evaluation may reuse that corpus through a separately owned adapter without
+making it a product dependency.
 
 ---
 
