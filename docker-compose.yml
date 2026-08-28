@@ -8,8 +8,10 @@ services:
     volumes:
       # Mount workspace for file operations
       - ./workspace:/workspace
-      # Persist Claude Code configuration across container restarts
+      # Persist Claude Code login/config across container restarts (set up via `make docker-login`)
       - claude-config:/home/pentester/.claude
+      # Persist Codex login/config across container restarts
+      - codex-config:/home/pentester/.codex
       # Persist CCR configuration
       - ccr-config:/home/pentester/.claude-code-router
     stdin_open: true
@@ -44,7 +46,11 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
 
 volumes:
-  # Named volume for Claude Code config persistence
+  # Explicit names so Docker login/status/shell commands and compose share the
+  # same persistent login volumes regardless of the compose project name.
   claude-config:
+    name: pentestgpt-claude
+  codex-config:
+    name: pentestgpt-codex
   # Named volume for CCR config persistence
   ccr-config:
