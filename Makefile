@@ -1,7 +1,7 @@
 # PentestGPT Makefile
 # Usage: make [target]
 
-.PHONY: help install test test-all test-cov test-verbose test-fast test-backend
+.PHONY: help install config test test-all test-cov test-verbose test-fast test-backend
 .PHONY: lint lint-fix format format-check typecheck clean build watch
 .PHONY: check check-agent test-agent check-agent-new test-agent-new run
 .PHONY: ci ci-quick
@@ -43,6 +43,10 @@ AGENT_EXTRA ?= all
 install:
 	uv sync
 	cd pentestgpt_agent && uv sync --extra $(AGENT_EXTRA)
+
+# Configure authentication (interactive menu: Claude login, OpenRouter, Anthropic API, Local LLM)
+config:
+	@./scripts/config.sh
 
 # ============================================================================
 # Testing

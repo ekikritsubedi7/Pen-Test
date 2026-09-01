@@ -56,7 +56,7 @@ PENTESTGPT_AUTH_MODE=manual
 EOF
 
         echo -e "${GREEN}Claude Code subscription mode selected.${NC}"
-        echo -e "${BLUE}After running 'make connect', execute 'claude login' inside the container.${NC}"
+        echo -e "${BLUE}After running 'make docker-shell', execute 'claude login' inside the container.${NC}"
         ;;
 
     2)
@@ -84,7 +84,7 @@ EOF
         chmod 600 "$ENV_FILE"
 
         echo -e "${GREEN}OpenRouter configuration saved!${NC}"
-        echo -e "${BLUE}CCR will be configured automatically when you run 'make connect'${NC}"
+        echo -e "${BLUE}CCR will be configured automatically when you start the agent${NC}"
         ;;
 
     3)
@@ -131,7 +131,7 @@ EOF
         echo "  2. To customize models or URL, edit:"
         echo "     scripts/ccr-config-template.json"
         echo ""
-        echo "  3. Run 'make connect' to start PentestGPT"
+        echo "  3. Run 'make run TARGET=<target>' to start PentestGPT"
         ;;
 
     *)
@@ -142,4 +142,4 @@ esac
 
 echo ""
 echo -e "${GREEN}Configuration complete!${NC}"
-echo -e "Run ${PURPLE}make connect${NC} to start PentestGPT."
+echo -e "Run ${PURPLE}make run TARGET=<target>${NC} to start PentestGPT."
