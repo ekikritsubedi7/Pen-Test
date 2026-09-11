@@ -120,6 +120,8 @@ logs/
 
 # Agent runs
 agent_runs/
+pentestgpt_agent/runs/
+pentestgpt_agent/agent-workspaces/
 
 # Legacy project files (when running from legacy/)
 config/chatgpt_config.py

@@ -35,13 +35,23 @@ Framework work runs inside the nested project:
 
 ```bash
 cd pentestgpt_agent
-uv sync --extra claude          # or codex / all
+uv sync --extra claude          # or codex / cursor / all
 uv run python -m pytest -q
 uv run ruff check src tests
 uv run ruff format --check src tests
 uv run mypy src
 uv lock --check
 uv build
+```
+
+Cursor local provider (same Supervisor/Executor slot as Codex):
+
+```bash
+cd pentestgpt_agent
+uv sync --extra cursor
+export CURSOR_API_KEY=...   # also documented in root .env.example
+uv run pentestgpt-agent --backend cursor --goal "..." --target http://127.0.0.1:8000
+# default model is composer-2.5 when --model is omitted
 ```
 
 From the repository root:
