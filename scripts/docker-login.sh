@@ -24,7 +24,7 @@ docker volume create "$CODEX_VOL" >/dev/null
 # --- live, truthful "is it actually working?" checks (a present-but-stale token fails) ---
 codex_live_ok() {
   docker run --rm -v "$CODEX_VOL":/home/pentester/.codex --entrypoint bash "$IMAGE" -lc '
-    codex exec -m gpt-5.4-mini -c model_reasoning_effort="low" --skip-git-repo-check \
+    codex exec -c model_reasoning_effort="low" --skip-git-repo-check \
       "reply with exactly OK" 2>/dev/null | grep -qiw ok' >/dev/null 2>&1
 }
 claude_live_ok() {
