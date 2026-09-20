@@ -3,7 +3,7 @@
 import pytest
 
 from pentestgpt_legacy.llm.base import BaseProvider, Message
-from pentestgpt_legacy.llm.client import LLMClient
+from pentestgpt_legacy.llm.client import LLMClient, run_sync
 from pentestgpt_legacy.llm.registry import ModelSpec, ProviderInfo
 
 pytestmark = pytest.mark.unit
@@ -76,3 +76,12 @@ def test_history_trimmed_to_length_and_starts_with_user() -> None:
     for messages, _system in provider.calls:
         assert len(messages) <= 2
         assert messages[0]["role"] == "user"
+
+
+@pytest.mark.asyncio
+async def test_run_sync_propagates_errors_from_running_loop() -> None:
+    async def fail() -> None:
+        raise RuntimeError("provider unavailable")
+
+    with pytest.raises(RuntimeError, match="provider unavailable"):
+        run_sync(fail())
