@@ -62,5 +62,21 @@ def test_get_client_ollama_no_key(monkeypatch: pytest.MonkeyPatch) -> None:
     assert client.provider.base_url == "http://localhost:11434/v1"
 
 
+def test_get_client_anonrouter(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(factory, "get_settings", lambda: _settings(anonrouter_api_key="sk-ar"))
+    client = get_client("anonrouter:meta-llama/llama-3.3-70b")
+    assert isinstance(client.provider, OpenAICompatibleProvider)
+    assert client.provider.base_url == "https://api.anonrouter.ai/v1"
+    # Bearer key is taken from ANONROUTER_API_KEY, not another provider's field.
+    assert client.provider.api_key == "sk-ar"
+    assert client.spec.api_id == "meta-llama/llama-3.3-70b"
+
+
+def test_get_client_anonrouter_missing_key_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(factory, "get_settings", lambda: _settings(openai_api_key="sk-x"))
+    with pytest.raises(MissingCredentialsError, match="ANONROUTER_API_KEY"):
+        get_client("anonrouter:meta-llama/llama-3.3-70b")
+
+
 def test_list_models_nonempty() -> None:
     assert list_models()
