@@ -37,6 +37,17 @@ def test_base_url_default_and_override() -> None:
     assert overridden.base_url_for(PROVIDERS["deepseek"]) == "http://localhost:9/v1"
 
 
+def test_anonrouter_key_and_base_url() -> None:
+    settings = LLMSettings(_env_file=None, anonrouter_api_key="sk-ar")
+    assert settings.api_key_for(PROVIDERS["anonrouter"]) == "sk-ar"
+    assert settings.base_url_for(PROVIDERS["anonrouter"]) == "https://api.anonrouter.ai/v1"
+
+    overridden = LLMSettings(
+        _env_file=None, anonrouter_api_key="sk-ar", anonrouter_base_url="http://localhost:9/v1"
+    )
+    assert overridden.base_url_for(PROVIDERS["anonrouter"]) == "http://localhost:9/v1"
+
+
 def test_configured_providers(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = LLMSettings(_env_file=None, openai_api_key="x")
     monkeypatch.setattr(config_mod, "_settings", fake)

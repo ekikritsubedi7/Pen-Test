@@ -37,8 +37,42 @@ def test_resolve_ollama_empty_is_none() -> None:
     assert resolve("ollama:") is None
 
 
+def test_resolve_anonrouter_dynamic() -> None:
+    spec = resolve("anonrouter:meta-llama/llama-3.3-70b")
+    assert spec is not None
+    assert spec.provider == "anonrouter"
+    # The nested router id is sent on the wire verbatim, prefix stripped.
+    assert spec.api_id == "meta-llama/llama-3.3-70b"
+
+
+def test_resolve_anonrouter_preserves_case_and_nesting() -> None:
+    # Synthetic casing verifies that the resolver does not normalize the
+    # account-provided catalog ID before sending it to AnonRouter.
+    spec = resolve("anonrouter:Qwen/Qwen3-235B-A22B")
+    assert spec is not None
+    assert spec.api_id == "Qwen/Qwen3-235B-A22B"
+
+
+def test_resolve_anonrouter_empty_is_none() -> None:
+    assert resolve("anonrouter:") is None
+    assert resolve("anonrouter:   ") is None
+
+
 def test_resolve_unknown_is_none() -> None:
     assert resolve("definitely-not-a-model") is None
+
+
+def test_anonrouter_provider_registered() -> None:
+    info = PROVIDERS["anonrouter"]
+    assert info.kind == "openai"
+    assert info.base_url == "https://api.anonrouter.ai/v1"
+    assert info.env == "ANONROUTER_API_KEY"
+    assert info.requires_key is True
+
+
+def test_anonrouter_pins_no_static_models() -> None:
+    # The router's catalog changes, so no model subset is checked in.
+    assert all(spec.provider != "anonrouter" for spec in MODELS.values())
 
 
 def test_all_model_ids_unique_and_nonempty() -> None:
