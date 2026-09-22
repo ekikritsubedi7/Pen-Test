@@ -62,7 +62,7 @@ product verification path.
 ## Documentation map
 
 - `docs/architecture.md` — current repository and module decisions.
-- `docs/operations.md` — operator cheatsheet: Claude Code login, local run, Docker auth.
+- `docs/operations.md` — starting and operating SOP: command catalog, first start, day-to-day run.
 - `pentestgpt_agent/CONTEXT.md` — domain language and invariants.
 - `pentestgpt_agent/README.md` — framework development and operation.
 - `docs/docker-dev-plan.md` — current Docker/auth status and known gap.
